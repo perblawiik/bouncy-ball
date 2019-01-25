@@ -1,8 +1,3 @@
-
-% Stop the simulation by pressing CTRL + C in the command window
-
-
-
 clear;
 
 h = 0.01;   % this time is very important depending on later values, the smaller the better
@@ -23,7 +18,7 @@ Fkp = [0; 0; 0; 0; 0];              % Fk'
 BONDS = size(I,1);
 POINTS = size(X,1);
 
-for cycle=1:5000    % how many steps will be run
+for cycle=1:5000
     
     Vp = zeros(POINTS,2);       % set to zero so the components from each connected spring can be += and added separately
     for n = 1:BONDS     % Loop through the springs
