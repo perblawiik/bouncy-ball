@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 
 #include "Shader.h"
+#include "Matrix.h"
+
 #include <iostream>
 
 /** CONSTANTS **/
@@ -15,6 +17,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 // Checks if a key is currently being pressed
 void processInput(GLFWwindow *window);
+
+void simulationCalculations();
 
 int main() 
 {
@@ -113,7 +117,6 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		// Activate shader
-		//glUseProgram(shaderProgram);
 		myShader.use();
 
 		// Update time and pass in to the shader
@@ -149,4 +152,37 @@ void processInput(GLFWwindow* window)
 	// If user press the escape key, close GLFW
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
+}
+
+void simulationCalculations() 
+{
+
+	GLfloat h = 0.01f, k = 20.0f, b = 10.0f, g = 0.0f;
+
+	GLint BONDS = 3;
+	GLint POINTS = 4;
+
+	//m = [50; 1; 1; 1];
+	Matrix m(4, 1);
+	m(1, 1) = 50.0f; m(2, 1) = 1.0f; m(3, 1) = 1.0f; m(4, 1) = 1.0f;
+	//X = [1 5; 1 15; 1 25; 11 25];
+	Matrix X(4, 2);
+	X(1, 1) = 1.0f; X(1, 2) = 5.0f;
+	X(2, 1) = 1.0f; X(2, 2) = 15.0f;
+	X(3, 1) = 1.0f; X(3, 2) = 25.0f;
+	X(4, 1) = 11.0f; X(4, 2) = 25.0f;
+	//I = [1 2; 2 3; 3 4];
+	Matrix I(3, 2);
+	I(1, 1) = 1.0f; I(1, 2) = 2.0f;
+	I(2, 1) = 2.0f; I(2, 2) = 3.0f;
+	I(3, 1) = 3.0f; I(3, 2) = 4.0f;
+	//V = [0 0; 0 0; 0 0; 5 0];
+	Matrix V(4, 2);
+	V(4, 1) = 5.0f;
+	//Vp = [0 0; 0 0; 0 0; 0 0];
+	Matrix Vp(4, 2);
+	//F = [0; 0; 0];
+	Matrix F(3, 1);
+	//Fp = [0; 0; 0];
+	Matrix Fp(3, 1);
 }
