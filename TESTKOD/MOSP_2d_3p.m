@@ -12,10 +12,6 @@ g = 9.8;
     % Floor bounciness multiplier (0-1 preferably :3)
 fBounce = 0.2; 
 
-
-
-     
-
 % PARTICLES AND SPRINGS
 % ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
     % masses [m]/ per particle
