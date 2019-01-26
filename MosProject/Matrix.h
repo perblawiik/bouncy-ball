@@ -3,6 +3,7 @@
 #define MATRIX_H
 
 #include <iostream>
+#include <math.h>
 
 class Matrix 
 {
@@ -30,12 +31,6 @@ public:
 		}
 	}
 
-	// Clone function
-	Matrix* clone() 
-	{
-		return new Matrix(*this);
-	}
-
 	// Assignment operator
 	Matrix &operator=(const Matrix &m)
 	{
@@ -43,41 +38,151 @@ public:
 		Matrix copy(m);
 
 		// Swap member variables
-		std::swap(rows, copy.rows);
-		std::swap(columns, copy.columns);
-		std::swap(length, copy.length);
-		std::swap(values, copy.values);
+		std::swap(this->rows, copy.rows);
+		std::swap(this->columns, copy.columns);
+		std::swap(this->length, copy.length);
+		std::swap(this->values, copy.values);
 
 		// Return this instance to allow cascading
 		return *this;
 	}
 
-	// Function call operator
+	// Function call operator - Returns the value at position (row, column)
 	float &operator()(const int r, const int c) 
 	{
-		if (r > rows || rows < 1) {
-			std::cout << "WARNING! Matrix row number out of bounds!" << std::endl;
+		if (r > this->rows || r < 1) {
+			std::cout << "WARNING! Matrix::Function Call Operator::Row number out of bounds!" << std::endl;
 		}
-		else if (c > columns || c < 1) {
-			std::cout << "WARNING! Matrix column number out of bounds!" << std::endl;
+		else if (c > this->columns || c < 1) {
+			std::cout << "WARNING! Matrix::Function Call Operator::Column number out of bounds!" << std::endl;
 		}
 
-		return values[(r-1)*columns + c-1];
+		return this->values[(r-1)*this->columns + c-1];
 	}
 
-	// Subscript operator
+	// Subscript operator - Returns the value from given array index 
 	float &operator[] (const int index) 
 	{
-		if (index > length || index < 0) {
-			std::cout << "WARNING! Matrix index out of bound!" << std::endl;
+		if (index > this->length || index < 0) {
+			std::cout << "WARNING! Matrix::Subscript Operator::Index out of bound!" << std::endl;
 		}
 
-		return values[index];
+		return this->values[index];
 	}
 
-	const int size() 
+	// Subtract operator
+	Matrix operator-(const Matrix &rhs)
 	{
-		return length;
+		if (this->rows != rhs.rows || this->columns != rhs.columns) {
+			std::cout << "WARNING! Matrix::Subtraction Operator::Dimensions dont match!" << std::endl;
+		}
+
+		Matrix result(this->rows, this->columns);
+
+		for (int i = 0; i < this->length; ++i) {
+			result.values[i] = this->values[i] - rhs.values[i];
+		}
+
+		return result;
+	}
+
+	// Addition operator
+	Matrix operator+(const Matrix &rhs)
+	{
+		if (this->rows != rhs.rows || this->columns != rhs.columns) {
+			std::cout << "WARNING! Matrix::Addition Operator::Dimensions dont match!" << std::endl;
+		}
+
+		Matrix result(this->rows, this->columns);
+
+		for (int i = 0; i < this->length; ++i) {
+			result.values[i] = this->values[i] + rhs.values[i];
+		}
+
+		return result;
+	}
+
+	// Multiply operator
+	Matrix operator*(const float &k)
+	{
+		Matrix result(this->rows, this->columns);
+
+		for (int i = 0; i < this->length; ++i) {
+			result.values[i] = this->values[i] * k;
+		}
+
+		return result;
+	}
+
+	/*  Input parameters
+	row_number: Integer that specifies which row to extract.
+	out: Matrix (1xN) to copy the specified row into. */
+	void copyRow(const int row_number, Matrix &out)
+	{
+		if (row_number < 1 || row_number > this->rows) {
+			std::cout << "WARNING! Matrix::Copy Row Function::Row number out of bounds!" << std::endl;
+		}
+
+		for (int i = 1; i <= this->columns; ++i) {
+			out.values[i - 1] = this->values[(row_number - 1) * this->columns + (i - 1)];
+		}
+	}
+
+	void replaceRow(const int row_number, const Matrix &in)
+	{
+		if (row_number < 1 || row_number > this->rows) {
+			std::cout << "WARNING! Matrix::Replace Row Function::Row number out of bounds!" << std::endl;
+		}
+
+		for (int i = 1; i <= this->columns; ++i) {
+			this->values[(row_number - 1) * this->columns + (i - 1)] = in.values[i - 1];
+		}
+	}
+
+	// Set magnitude to 1
+	void normalize() 
+	{
+		float sum = 0.0f;
+		for (int i = 0; i < this->length; ++i) {
+			sum += this->values[i] * this->values[i];
+		}
+		sum = sqrt(sum);
+
+		// Dont divide by zero
+		if (sum > 0.00000001) {
+			for (int i = 0; i < this->length; ++i) {
+				this->values[i] = this->values[i] / sum;
+			}
+		}
+	}
+
+	// Returns the scalar product of this matrix and input matrix 
+	// OBS! Works only for row vectors atm
+	float dot(const Matrix &rhs)
+	{
+		float result = 0.0f;
+
+		for (int i = 0; i < this->length; ++i) {
+			result += this->values[i] * rhs.values[i];
+		}
+
+		return result;
+	}
+
+
+	const int size()
+	{
+		return this->length;
+	}
+
+	const int numRows()
+	{
+		return this->rows;
+	}
+
+	const int numColumns()
+	{
+		return this->columns;
 	}
 
 	// Destructor
