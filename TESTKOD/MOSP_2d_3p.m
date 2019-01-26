@@ -1,29 +1,51 @@
-
-% Stop the simulation by pressing CTRL + C in the command window
-
-
-
 clear;
 
-h = 0.01;   % this time is very important depending on later values, the smaller the better
+% CONSTANTS
+    % time between each approximation
+h = 0.01;
+    % spring constant
+k = 50;
+    % resistativitation constant
+b = 5;
+    % gravitational constant
+g = 9.8;
+    % Floor bounciness multiplier (0-1 preferably :3)
+fBounce = 0.2; 
 
-k = 100;    % spring constant
-b = 5;      % resistativitation constant
-g = 9.8;    % gravitational constant
 
 
-m = [1; 1; 1; 1];                   % masses [m]/ per particle
-X = [10 10; 20 10; 15 15; 25 15];   % particle x, y Pos [Xx Xy] / per particle
-I = [1 2; 2 3; 1 3; 3 4; 2 4];      % particle indices for spring bonds [i1 i2]/ per spring
-V = [0 0; 0 0; 0 0; 0 0];           % starting velocity [Vx Vy]/ per particle
-Vp = [0 0; 0 0; 0 0; 0 0];          % V'
-Fk = [0; 0; 0; 0; 0];               % Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation)
-Fkp = [0; 0; 0; 0; 0];              % Fk'
+     
+
+% PARTICLES AND SPRINGS
+% ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
+    % masses [m]/ per particle
+m = [1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1;];
+    % particle x, y Pos [Xx Xy] / per particle
+X = [20 10; 24 11; 26 13; 27 17; 26 21; 24 23; 20 24; 16 23; 14 21; 13 17; 14 13; 16 11; 20 17];
+    % particle indices for spring bonds [i1 i2]/ per spring
+I = [1 2; 2 3; 3 4; 4 5; 5 6; 6 7; 7 8; 8 9; 9 10; 10 11; 11 12; 12 1;
+     1 13; 2 13; 3 13; 4 13; 5 13; 6 13; 7 13; 8 13; 9 13; 10 13; 11 13; 12 13;]; 
 
 BONDS = size(I,1);
 POINTS = size(X,1);
 
-for cycle=1:5000    % how many steps will be run
+% DEFINING S.S.VARIABLES, STARTING VALUES
+    % starting velocity [Vx Vy]/ per particle
+V = zeros(POINTS,2);
+% ***V(index,:) = [a b]; for initial velocities***
+    % V'
+Vp = zeros(POINTS,2);
+    % Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation)
+Fk = zeros(BONDS,2);               
+    % Fk'
+Fkp = zeros(BONDS,2);             
+
+% SIMULATION
+    % how many animation frames
+CYCLES = 5000;
+    % where the particle animation positions are stored
+animation = zeros(POINTS,2,CYCLES); animation(:,:,1) = X;
+for cycle=1:CYCLES -1    
     
     Vp = zeros(POINTS,2);       % set to zero so the components from each connected spring can be += and added separately
     for n = 1:BONDS     % Loop through the springs
@@ -38,28 +60,35 @@ for cycle=1:5000    % how many steps will be run
     Vp = Vp - [0 g];    % gravity is added for all points
     
     % approximating the new values using: X_n+1 = X_n + h*X'_n
-    % they're not supressed for debugging purposes
-    V  = V  + h*Vp
-    Fk = Fk + h*Fkp
-    X  = X  + h*V
+    V  = V  + h*Vp;
+    Fk = Fk + h*Fkp;
+    X  = X  + h*V;
     
     % Code that flips Y-ward velocity when the particle has Xy<0
-    V(:,2) = (X(:,2)>0).*V(:,2)-(X(:,2)<0).*V(:,2);
+    V(:,2) = (X(:,2)>0).*V(:,2)-fBounce*(X(:,2)<0).*V(:,2);
+    % Sets Xy values to 0 if they're below 0
+    X(:,2) = (X(:,2)>0).*X(:,2);
     
-    
-    % draw each frame in "real timeish" (atm)
+    animation(:,:,cycle + 1) = X;
+end
+
+% ANIMATION
+% Stop the animation by pressing CTRL + C in the command window
+for i = 1:CYCLES
     clf;
     hold on;
     plot([-50 50], [0 0]); 
-    plot(X(:,1),X(:,2),'or');
+    plot(animation(:,1,i),animation(:,2,i),'ro')
     for n = 1:BONDS 
-        plot([X(I(n,1),1) X(I(n,2),1)],[X(I(n,1),2) X(I(n,2),2)],'b');
+        plot([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)],'b--');
     end
     xlim([-15 40]);
     ylim([-5 40]);
     
-    pause(h); % bad commmand since computations take time making each frame longer than h seconds
+    % used to set frame time but drawing takes time so it's not accurate
+    pause(h); 
 end
+
 
 
 
