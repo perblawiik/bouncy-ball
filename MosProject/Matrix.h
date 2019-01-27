@@ -3,7 +3,6 @@
 #define MATRIX_H
 
 #include <iostream>
-#include <algorithm>
 
 class Matrix 
 {
@@ -164,16 +163,16 @@ public:
 	}
 
 	// Returns the scalar product of this matrix and input matrix 
-	// OBS! Works only for row vectors atm
+	// OBS! Works only for 1xN or Nx1 matrices
 	float dot(const Matrix &rhs)
 	{
-		float result = 0.0f;
+		float dotProduct = 0.0f;
 
 		for (int i = 0; i < this->length; ++i) {
-			result += this->values[i] * rhs.values[i];
+			dotProduct += this->values[i] * rhs.values[i];
 		}
 
-		return result;
+		return dotProduct;
 	}
 
 

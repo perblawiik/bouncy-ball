@@ -12,6 +12,7 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 /** STRUCTS **/
+// Struct with all constant values for the simulation
 struct Settings 
 {
 	GLfloat h; // Step
@@ -76,14 +77,14 @@ int main()
 
 	// Rectangle
 	float vertices[] = {
-		-0.5f,  0.5f, 0.0f   // top left 
 		-0.5f, -0.5f, 0.0f,  // bottom left
 		0.5f, -0.5f, 0.0f,  // bottom right
-		0.5f,  0.5f, 0.0f,  // top right	
+		0.5f,  0.5f, 0.0f,  // top right
+		-0.5f,  0.5f, 0.0f   // top left 	
 	};
 	unsigned int indices[] = {  
 		0, 1, 2,   // first triangle
-		0, 2, 3   // second triangle
+		0, 3, 2   // second triangle
 	};
 
 	// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
@@ -116,7 +117,7 @@ int main()
 	glEnableVertexAttribArray(0);
 
 	// Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	// Time variable
 	//GLfloat time = (GLfloat)glfwGetTime();
@@ -128,10 +129,10 @@ int main()
 
 	Settings settings = {};
 	settings.h = 0.001f; // Step
-	settings.k = 50.0f; // Spring constant
-	settings.b = 5.0f; // Resistance constant
+	settings.k = 100.0f; // Spring constant
+	settings.b = 3.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.NUM_BONDS = 5; // Total number of bonds
+	settings.NUM_BONDS = 6; // Total number of bonds
 	settings.NUM_POINTS = 4; // Total number of points (particles)
 	settings.DIM = 2; // 2-D
 
@@ -148,13 +149,14 @@ int main()
 	X(3, 1) = 0.5f; X(3, 2) = -0.5f;
 	X(4, 1) = 0.5f; X(4, 2) = 0.5f;
 
-	// Particle indices for spring bonds [i1 i2]/ per spring ( I = [1 2; 2 3; 1 3; 3 4; 2 4]; )
+	// Particle indices for spring bonds [i1 i2]/ per spring ( I = [1 2; 2 3; 3 4; 4 1; 1 3]; )
 	Matrix I(settings.NUM_BONDS, 2);
 	I(1, 1) = 1.0f; I(1, 2) = 2.0f;
 	I(2, 1) = 2.0f; I(2, 2) = 3.0f;
-	I(3, 1) = 1.0f; I(3, 2) = 3.0f;
-	I(4, 1) = 3.0f; I(4, 2) = 4.0f;
-	I(5, 1) = 2.0f; I(5, 2) = 4.0f;
+	I(3, 1) = 3.0f; I(3, 2) = 4.0f;
+	I(4, 1) = 4.0f; I(4, 2) = 1.0f;
+	I(5, 1) = 1.0f; I(5, 2) = 3.0f;
+	I(6, 1) = 4.0f; I(6, 2) = 2.0f;
 
 	// Starting velocity [Vx Vy]/ per particle ( V = [0 0; 0 0; 0 0; 0 0];  )
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
@@ -192,22 +194,20 @@ int main()
 
 		/**********S I M U L A T I O N**********/
 		//-------------------------------------//
+
+		// Code that flips Y - ward velocity when the particle has Xy < -2.0  ( V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2); )
+		for (int j = 1; j <= settings.NUM_POINTS; ++j) {
+
+			if (X(j, 2) < -2.0f) {
+				V(j, 2) = -1.2f*V(j, 2);
+			}
+		}
 		
 		// Calculate one cycle for the system
 		calculateSimulation(settings, m, X, I, V, Vp, Fk, Fkp, zeros, vec1, vec2, diff);
 
 		// Update particle positions
 		X.copyValues(positions);
-
-		// Code that flips Y - ward velocity when the particle has Xy < -1.0
-		for (int j = 1; j <= settings.NUM_POINTS; ++j) {
-
-			if ( X(j, 2) < -2.0f ) {
-				float Vy = V(j, 2);
-				V(j, 2) = -1.0f*Vy;
-			}
-		}
-		//V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2);
 
 		//-------------------------------------//
 		/***************************************/
@@ -283,11 +283,10 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 		float m1 = m((int)I(n, 1), 1); // Mass of point 1
 		float m2 = m((int)I(n, 2), 1); // Mass of point 2
 		float F = Fk(n, 1); // Spring force
-		diff = diff * ((1 / m1) * (s.b*dV + F));
-		vec1 = vec1 - diff;
-		vec2 = vec2 + diff;
-		Vp.replaceRow((int)I(n, 1), vec1); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */ 
-		Vp.replaceRow((int)I(n, 2), vec2); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */ 
+		diff = diff * (1 / m1) * (s.b*dV + F);
+
+		Vp.replaceRow((int)I(n, 1), vec1 - diff); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */
+		Vp.replaceRow((int)I(n, 2), vec2 + diff); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */
 
 		// The derivative for Fk
 		Fkp(n, 1) = s.k * dV; /* MATLAB: Fkp(n) = k * dV; */
