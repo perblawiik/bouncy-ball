@@ -11,6 +11,19 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
+/** STRUCTS **/
+struct Settings 
+{
+	GLfloat h; // Step
+	GLfloat k; // Spring constant
+	GLfloat b; // Resistance constant
+	GLfloat g; // Gravitation constant
+
+	GLint NUM_BONDS;
+	GLint NUM_POINTS;
+	GLint DIM;
+};
+
 /** FUNCTION DECLARATIONS **/
 // A callback function on the window that gets called each time the window is resized
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -18,7 +31,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 // Checks if a key is currently being pressed
 void processInput(GLFWwindow *window);
 
-void simulationCalculations();
+// Calculates differential equations of the system
+void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Matrix &V, Matrix &Vp,
+	Matrix &Fk, Matrix &Fkp, Matrix &zeros, Matrix &vec1, Matrix &vec2, Matrix &diff);
 
 int main() 
 {
@@ -61,14 +76,14 @@ int main()
 
 	// Rectangle
 	float vertices[] = {
-		0.5f,  0.5f, 0.0f,  // top right
-		0.5f, -0.5f, 0.0f,  // bottom right
-		-0.5f, -0.5f, 0.0f,  // bottom left
 		-0.5f,  0.5f, 0.0f   // top left 
+		-0.5f, -0.5f, 0.0f,  // bottom left
+		0.5f, -0.5f, 0.0f,  // bottom right
+		0.5f,  0.5f, 0.0f,  // top right	
 	};
 	unsigned int indices[] = {  
-		0, 1, 3,   // first triangle
-		1, 2, 3    // second triangle
+		0, 1, 2,   // first triangle
+		0, 2, 3   // second triangle
 	};
 
 	// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
@@ -104,9 +119,66 @@ int main()
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	// Time variable
-	GLfloat time = (GLfloat)glfwGetTime();
+	//GLfloat time = (GLfloat)glfwGetTime();
 
-	simulationCalculations();
+	// Particle positions per cycle
+	GLfloat positions[8] = { 0.0f };
+
+	/**********S I M U L A T I O N**********/
+
+	Settings settings = {};
+	settings.h = 0.001f; // Step
+	settings.k = 50.0f; // Spring constant
+	settings.b = 5.0f; // Resistance constant
+	settings.g = 9.82f; // Gravitation constant
+	settings.NUM_BONDS = 5; // Total number of bonds
+	settings.NUM_POINTS = 4; // Total number of points (particles)
+	settings.DIM = 2; // 2-D
+
+	//Masses per particle ( m = [1; 1; 1; 1]; )
+	Matrix m(settings.NUM_POINTS, 1); // Create 4x1 matrix
+	for (int i = 0; i < m.size(); ++i) {
+		m[i] = 1.0f; // All masses set to 1
+	}
+
+	//Particle x, y Pos [Xx Xy] / per particle ( X = [10 10; 20 10; 15 15; 25 15]; )
+	Matrix X(settings.NUM_POINTS, settings.DIM);
+	X(1, 1) = -0.5f; X(1, 2) = 0.5f;
+	X(2, 1) = -0.5f; X(2, 2) = -0.5f;
+	X(3, 1) = 0.5f; X(3, 2) = -0.5f;
+	X(4, 1) = 0.5f; X(4, 2) = 0.5f;
+
+	// Particle indices for spring bonds [i1 i2]/ per spring ( I = [1 2; 2 3; 1 3; 3 4; 2 4]; )
+	Matrix I(settings.NUM_BONDS, 2);
+	I(1, 1) = 1.0f; I(1, 2) = 2.0f;
+	I(2, 1) = 2.0f; I(2, 2) = 3.0f;
+	I(3, 1) = 1.0f; I(3, 2) = 3.0f;
+	I(4, 1) = 3.0f; I(4, 2) = 4.0f;
+	I(5, 1) = 2.0f; I(5, 2) = 4.0f;
+
+	// Starting velocity [Vx Vy]/ per particle ( V = [0 0; 0 0; 0 0; 0 0];  )
+	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
+
+	// Acceleration dV/dt ( Vp = [0 0; 0 0; 0 0; 0 0]; )
+	Matrix Vp(settings.NUM_POINTS, settings.DIM); // All set to zero by default
+
+	// Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation) ( Fk = [0; 0; 0; 0; 0]; )
+	Matrix Fk(settings.NUM_BONDS, 1); // All set to zero by default
+
+	// Fkp = dFp/dt ( Fkp [0; 0; 0; 0; 0]; )
+	Matrix Fkp(settings.NUM_BONDS, 1); // All set to zero by default
+
+	// Used to set Vp to zero each cycle
+	Matrix zeros(settings.NUM_POINTS, settings.DIM);
+
+	// Dummy vectors (1xDIM matrix)
+	Matrix vec1(1, settings.DIM);
+	Matrix vec2(1, settings.DIM);
+
+	// Vector from point 1 to point 2;
+	Matrix diff(1, settings.DIM);
+
+	/***************************************/
 
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
@@ -118,12 +190,37 @@ int main()
 		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		/**********S I M U L A T I O N**********/
+		//-------------------------------------//
+		
+		// Calculate one cycle for the system
+		calculateSimulation(settings, m, X, I, V, Vp, Fk, Fkp, zeros, vec1, vec2, diff);
+
+		// Update particle positions
+		X.copyValues(positions);
+
+		// Code that flips Y - ward velocity when the particle has Xy < -1.0
+		for (int j = 1; j <= settings.NUM_POINTS; ++j) {
+
+			if ( X(j, 2) < -2.0f ) {
+				float Vy = V(j, 2);
+				V(j, 2) = -1.0f*Vy;
+			}
+		}
+		//V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2);
+
+		//-------------------------------------//
+		/***************************************/
+
 		// Activate shader
 		myShader.use();
 
 		// Update time and pass in to the shader
-		time = (GLfloat)glfwGetTime();
-		myShader.setFloat("time", time);
+		//time = (GLfloat)glfwGetTime();
+		//myShader.setFloat("time", time);
+
+		// Insert particle positions in shader
+		myShader.setFloat("positions", positions, 8);
 
 		// Draw object
 		glBindVertexArray(VAO);
@@ -156,122 +253,54 @@ void processInput(GLFWwindow* window)
 		glfwSetWindowShouldClose(window, true);
 }
 
-void simulationCalculations() 
+void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Matrix &V, Matrix &Vp,
+	Matrix &Fk, Matrix &Fkp, Matrix &zeros, Matrix &vec1, Matrix &vec2, Matrix &diff)
 {
-	// Step
-	const GLfloat h = 0.01f; 
-	// Spring constant
-	const GLfloat k = 100.0f;
-	// Resistance constant
-	const GLfloat b = 5.0f; 
-	// Gravitation constant
-	const GLfloat g = 9.82f;
+	// Set to zero so the components from each connected spring can be += and added separately
+	Vp = zeros; 
+	for (int n = 1; n <= s.NUM_BONDS; ++n) // Loop through the springs
+	{
+		// Get point coordinates based on bond indices I
+		X.copyRow((int)I(n, 1), vec1);
+		X.copyRow((int)I(n, 2), vec2);
 
-	const GLint NUM_BONDS = 5;
-	const GLint NUM_POINTS = 4;
-	const GLint DIM = 2; // 2-D
+		// Get vector from point 1 to 2
+		diff = vec1 - vec2; /* MATLAB: dif = X(I(n, 1), :) - X(I(n, 2), :); */
 
-	//Masses per particle ( m = [1; 1; 1; 1]; )
-	Matrix m(NUM_POINTS, 1); // Create 4x1 matrix
-	m(1, 1) = 1.0f; m(2, 1) = 1.0f; m(3, 1) = 1.0f; m(4, 1) = 1.0f;
-	//Particle x, y Pos [Xx Xy] / per particle ( X = [10 10; 20 10; 15 15; 25 15]; )
-	Matrix X(NUM_POINTS, DIM);
-	X(1, 1) = 10.0f; X(1, 2) = 10.0f;
-	X(2, 1) = 20.0f; X(2, 2) = 10.0f;
-	X(3, 1) = 15.0f; X(3, 2) = 15.0f;
-	X(4, 1) = 25.0f; X(4, 2) = 15.0f;
-	// Particle indices for spring bonds [i1 i2]/ per spring ( I = [1 2; 2 3; 1 3; 3 4; 2 4]; )
-	Matrix I(NUM_BONDS, 2);
-	I(1, 1) = 1.0f; I(1, 2) = 2.0f;
-	I(2, 1) = 2.0f; I(2, 2) = 3.0f;
-	I(3, 1) = 1.0f; I(3, 2) = 3.0f;
-	I(4, 1) = 3.0f; I(4, 2) = 4.0f;
-	I(5, 1) = 2.0f; I(5, 2) = 4.0f;
-	// Starting velocity [Vx Vy]/ per particle ( V = [0 0; 0 0; 0 0; 0 0];  )
-	Matrix V(NUM_POINTS, DIM);
-	// Acceleration dV/dt ( Vp = [0 0; 0 0; 0 0; 0 0]; )
-	Matrix Vp(NUM_POINTS, DIM);
-	// Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation) ( Fk = [0; 0; 0; 0; 0]; )
-	Matrix Fk(NUM_BONDS, 1);
-	// Fkp = dFp/dt ( Fkp [0; 0; 0; 0; 0]; )
-	Matrix Fkp(NUM_BONDS, 1);
+		// Normalise it, used to give the Fk and Fb direction
+		diff.normalize(); /* MATLAB: nDif = dif / norm(dif); */
 
-	// Used to set Vp to zero each cycle
-	Matrix zeros(NUM_POINTS, DIM);
-	// Vector from point 1 to point 2;
-	Matrix vec1(1, DIM);
-	Matrix vec2(1, DIM);
-	Matrix diff(1, DIM);
+		// Get deltaV, speed difference between the particles in the spring's direction
+		V.copyRow((int)I(n, 1), vec1);
+		V.copyRow((int)I(n, 2), vec2);
+		float dV = diff.dot(vec1 - vec2); /* MATLAB: dV = dot(V(I(n, 1), :) - V(I(n, 2), :), nDif); */
 
-	int num_steps = 100;
-	for (int cycle = 0; cycle < num_steps; ++cycle) {
+		// Apply spring influence to the connected particles, 
+		// first one (Vp1) is added, second is subtracted, in the springs direction since they will be either
+		// both pulled towards eachother or drawn away from eachother.
+		Vp.copyRow((int)I(n, 1), vec1);
+		Vp.copyRow((int)I(n, 2), vec2);
+		float m1 = m((int)I(n, 1), 1); // Mass of point 1
+		float m2 = m((int)I(n, 2), 1); // Mass of point 2
+		float F = Fk(n, 1); // Spring force
+		diff = diff * ((1 / m1) * (s.b*dV + F));
+		vec1 = vec1 - diff;
+		vec2 = vec2 + diff;
+		Vp.replaceRow((int)I(n, 1), vec1); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */ 
+		Vp.replaceRow((int)I(n, 2), vec2); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */ 
 
-		// Set to zero so the components from each connected spring can be += and added separately
-		Vp = zeros; 
-		for (int n = 1; n <= NUM_BONDS; ++n) // Loop through the springs
-		{
-			// Get point coordinates based on bond indices I
-			X.copyRow((int)I(n, 1), vec1);
-			X.copyRow((int)I(n, 2), vec2);
-
-			// Get vector from point 1 to 2
-			diff = vec1 - vec2; /* MATLAB: dif = X(I(n, 1), :) - X(I(n, 2), :); */
-
-			// Normalise it, used to give the Fk and Fb direction
-			diff.normalize(); /* MATLAB: nDif = dif / norm(dif); */
-
-			// Get deltaV, speed difference between the particles in the spring's direction
-			V.copyRow((int)I(n, 1), vec1);
-			V.copyRow((int)I(n, 2), vec2);
-			float dV = diff.dot(vec1 - vec2); /* MATLAB: dV = dot(V(I(n, 1), :) - V(I(n, 2), :), nDif); */
-
-			// Apply spring influence to the connected particles, 
-			// first one (Vp1) is added, second is subtracted, in the springs direction since they will be either
-			// both pulled towards eachother or drawn away from eachother.
-			Vp.copyRow((int)I(n, 1), vec1);
-			Vp.copyRow((int)I(n, 2), vec2);
-			float m1 = m((int)I(n, 1), 1); // Mass of point 1
-			float m2 = m((int)I(n, 2), 1); // Mass of point 2
-			float F = Fk(n, 1); // Spring force
-			diff = diff * ((1 / m1) * (b*dV + F));
-			vec1 = vec1 - diff;
-			vec2 = vec2 + diff;
-			Vp.replaceRow((int)I(n, 1), vec1); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */ 
-			Vp.replaceRow((int)I(n, 2), vec2); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */ 
-
-			// The derivative for Fk
-			Fkp(n, 1) = k * dV; /* MATLAB: Fkp(n) = k * dV; */
-		}
-
-		// Add gravity for all points (-g to y coordinate)
-		for (int r = 1; r <= Vp.numRows(); ++r) { /* MATLAB: Vp = Vp - [0 g]; */
-			Vp(r, 2) = Vp(r, 2) - g;
-		}
-
-		// Approximating the new values using: X_n + 1 = X_n + h * X'_n
-		// (they're not supressed for debugging purposes)
-		V = V + (Vp * h); /* MATLAB: V = V + h * Vp */
-		Fk = Fk + (Fkp * h); /* MATLAB: Fk = Fk + h * Fkp */
-		X = X + (V * h); /* MATLAB: X = X + h * V */
-
-
-		// Print out velocities, spring forces and positions for the particles
-		std::cout << "Cycle: " << cycle << std::endl;
-
-		std::cout << "V = " << std::endl;
-		for (int i = 1; i <= V.numRows(); ++i) {
-			std::cout << V(i, 1) << " " << V(i, 2) << std::endl;
-		}
-		std::cout << "Fk = " << std::endl;
-		for (int i = 1; i <= Fk.numRows(); ++i) {
-			std::cout << Fk(i, 1) << std::endl;
-		}
-		std::cout << "X = " << std::endl;
-		for (int i = 1; i <= V.numRows(); ++i) {
-			std::cout << X(i, 1) << " " << X(i, 2) << std::endl;
-		}
-
-		//% Code that flips Y - ward velocity when the particle has Xy<0
-		//V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2);
+		// The derivative for Fk
+		Fkp(n, 1) = s.k * dV; /* MATLAB: Fkp(n) = k * dV; */
 	}
+
+	// Add gravity for all points (-g to y coordinate)
+	for (int r = 1; r <= s.NUM_POINTS; ++r) { /* MATLAB: Vp = Vp - [0 g]; */
+		Vp(r, 2) = Vp(r, 2) - s.g;
+	}
+
+	// Approximating the new values using: X_n + 1 = X_n + h * X'_n
+	// (they're not supressed for debugging purposes)
+	V = V + (Vp * s.h); /* MATLAB: V = V + h * Vp */
+	Fk = Fk + (Fkp * s.h); /* MATLAB: Fk = Fk + h * Fkp */
+	X = X + (V * s.h); /* MATLAB: X = X + h * V */
 }

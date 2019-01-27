@@ -3,7 +3,7 @@
 #define MATRIX_H
 
 #include <iostream>
-#include <math.h>
+#include <algorithm>
 
 class Matrix 
 {
@@ -112,6 +112,13 @@ public:
 		}
 
 		return result;
+	}
+
+	void copyValues(float out[])
+	{
+		for (int i = 0; i < this->length; ++i) {
+			out[i] = this->values[i];
+		} 
 	}
 
 	/*  Input parameters
