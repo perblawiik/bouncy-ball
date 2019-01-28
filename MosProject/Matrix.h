@@ -3,6 +3,7 @@
 #define MATRIX_H
 
 #include <iostream>
+#include <math.h>
 
 class Matrix 
 {

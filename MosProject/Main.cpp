@@ -76,19 +76,59 @@ int main()
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
 	// Rectangle
-	float vertices[] = {
-		-0.5f, -0.5f, 0.0f,  // bottom left
-		0.5f, -0.5f, 0.0f,  // bottom right
-		0.5f,  0.5f, 0.0f,  // top right
-		-0.5f,  0.5f, 0.0f   // top left 	
-	};
-	unsigned int indices[] = {  
-		0, 1, 2,   // first triangle
-		0, 3, 2   // second triangle
-	};
+	//float vertices[] = {
+	//	-0.5f, -0.5f, 0.0f,  // bottom left
+	//	0.5f, -0.5f, 0.0f,  // bottom right
+	//	0.5f,  0.5f, 0.0f,  // top right
+	//	-0.5f,  0.5f, 0.0f   // top left 	
+	//};
+	//unsigned int indices[] = {  
+	//	0, 1, 2,   // first triangle
+	//	0, 3, 2   // second triangle
+	//};
+
+	// Particle positions per cycle (passed into the shader)
+	GLfloat positions[34] = { 0.0f };
+
+	const int DIMS = 3;
+	const int NUM_SEGS = 8;
+	int num_triangles = NUM_SEGS * 2;
+	int num_verts = NUM_SEGS*2 + 1;
+	const float PI = 3.14159265359f;
+
+	GLfloat* circleVertices = new GLfloat[num_verts*DIMS];
+	GLfloat theta = 0.0f;
+
+	int row = 0;
+	for ( ; row < (num_verts - 1); ++row) {
+		
+		theta = ((GLfloat)row * PI) / GLfloat(NUM_SEGS);
+		circleVertices[row*DIMS] = cos(theta); // x-coordinate
+		circleVertices[row*DIMS + 1] = sin(theta); // y-coordinate
+		circleVertices[row*DIMS + 2] = 0.0f; // y-coordinate
+	}
+	// Set last vertex in the origin
+	circleVertices[row*DIMS] = 0.0f;
+	circleVertices[row*DIMS + 1] = 0.0f;
+	circleVertices[row*DIMS + 2] = 0.0f;
+
+	GLuint* circleIndices = new GLuint[num_triangles * 3];
+
+	row = 0;
+	for ( ; row < (num_triangles - 1); ++row) {
+
+		circleIndices[row * 3] = row;
+		circleIndices[(row * 3) + 1] = row + 1;
+		circleIndices[(row * 3) + 2] = num_verts - 1;
+	}
+	// Last triangle
+	circleIndices[row * 3] = row;
+	circleIndices[(row * 3) + 1] = 0;
+	circleIndices[(row * 3) + 2] = num_verts - 1;
+
 
 	// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
-	unsigned int VBO, VAO, EBO;
+	GLuint VBO, VAO, EBO;
 	glGenBuffers(1, &VBO);
 	glGenBuffers(1, &EBO);
 	glGenVertexArrays(1, &VAO);
@@ -97,10 +137,10 @@ int main()
 	glBindVertexArray(VAO);
 	// 2. Copy our vertices array in a buffer for OpenGL to use
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 3*num_verts*sizeof(GLfloat), circleVertices, GL_STATIC_DRAW);
 	// 3. Copy our index array in a element buffer for OpenGL to use
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3*num_triangles * sizeof(GLuint), circleIndices, GL_STATIC_DRAW);
 
 	// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
 	// glVertexAttribPointer Parameters :
@@ -113,7 +153,7 @@ int main()
 	//    Since the next set of position data is located exactly 3 times the size of a float away we specify that value as the stride.
 	// 6. This is the offset of where the position data begins in the buffer. 
 	//    Since the position data is at the start of the data array this value is just 0.
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void*)0);
 	glEnableVertexAttribArray(0);
 
 	// Wireframe mode
@@ -122,41 +162,51 @@ int main()
 	// Time variable
 	//GLfloat time = (GLfloat)glfwGetTime();
 
-	// Particle positions per cycle
-	GLfloat positions[8] = { 0.0f };
-
 	/**********S I M U L A T I O N**********/
 
 	Settings settings = {};
 	settings.h = 0.001f; // Step
 	settings.k = 100.0f; // Spring constant
-	settings.b = 3.0f; // Resistance constant
+	settings.b = 5.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.NUM_BONDS = 6; // Total number of bonds
-	settings.NUM_POINTS = 4; // Total number of points (particles)
+	settings.NUM_BONDS = num_triangles*2; // Total number of bonds
+	settings.NUM_POINTS = num_verts; // Total number of points (particles)
 	settings.DIM = 2; // 2-D
+
+	const float WEIGHT = 2.0f;
 
 	//Masses per particle ( m = [1; 1; 1; 1]; )
 	Matrix m(settings.NUM_POINTS, 1); // Create 4x1 matrix
 	for (int i = 0; i < m.size(); ++i) {
-		m[i] = 1.0f; // All masses set to 1
+		m[i] = WEIGHT/(float)settings.NUM_POINTS; // All masses set to 1
 	}
 
 	//Particle x, y Pos [Xx Xy] / per particle ( X = [10 10; 20 10; 15 15; 25 15]; )
 	Matrix X(settings.NUM_POINTS, settings.DIM);
-	X(1, 1) = -0.5f; X(1, 2) = 0.5f;
-	X(2, 1) = -0.5f; X(2, 2) = -0.5f;
-	X(3, 1) = 0.5f; X(3, 2) = -0.5f;
-	X(4, 1) = 0.5f; X(4, 2) = 0.5f;
+	for (int i = 0; i < settings.NUM_POINTS; ++i) {
+		X[i * 2] = circleVertices[i * 3];
+		X[i * 2 + 1] = circleVertices[i * 3 + 1];
+	}
+	for (int i = 0; i < X.size(); ++i) {
+		std::cout << X[i] << std::endl;
+	}
 
 	// Particle indices for spring bonds [i1 i2]/ per spring ( I = [1 2; 2 3; 3 4; 4 1; 1 3]; )
 	Matrix I(settings.NUM_BONDS, 2);
-	I(1, 1) = 1.0f; I(1, 2) = 2.0f;
-	I(2, 1) = 2.0f; I(2, 2) = 3.0f;
-	I(3, 1) = 3.0f; I(3, 2) = 4.0f;
-	I(4, 1) = 4.0f; I(4, 2) = 1.0f;
-	I(5, 1) = 1.0f; I(5, 2) = 3.0f;
-	I(6, 1) = 4.0f; I(6, 2) = 2.0f;
+	row = 0;
+	for ( ; row < settings.NUM_BONDS/2 - 1; ++row) {
+		I[row * 2] = (float)(row + 1);
+		std::cout << I[row * 2] << " ";
+		I[row * 2 + 1] = (float)(row + 2);
+		std::cout << I[row * 2 + 1] << std::endl;
+	}
+	I[row * 2] = (float)(row + 1);
+	I[row * 2 + 1] = 1.0f;
+	++row;
+	for (int i = 0 ; i < settings.NUM_BONDS/2; ++i, ++row) {
+		I[row * 2] = (float)(i + 1);
+		I[row * 2 + 1] = (float)settings.NUM_POINTS;
+	}
 
 	// Starting velocity [Vx Vy]/ per particle ( V = [0 0; 0 0; 0 0; 0 0];  )
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
@@ -165,10 +215,10 @@ int main()
 	Matrix Vp(settings.NUM_POINTS, settings.DIM); // All set to zero by default
 
 	// Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation) ( Fk = [0; 0; 0; 0; 0]; )
-	Matrix Fk(settings.NUM_BONDS, 1); // All set to zero by default
+	Matrix Fk(settings.NUM_BONDS, settings.DIM); // All set to zero by default
 
 	// Fkp = dFp/dt ( Fkp [0; 0; 0; 0; 0]; )
-	Matrix Fkp(settings.NUM_BONDS, 1); // All set to zero by default
+	Matrix Fkp(settings.NUM_BONDS, settings.DIM); // All set to zero by default
 
 	// Used to set Vp to zero each cycle
 	Matrix zeros(settings.NUM_POINTS, settings.DIM);
@@ -194,14 +244,6 @@ int main()
 
 		/**********S I M U L A T I O N**********/
 		//-------------------------------------//
-
-		// Code that flips Y - ward velocity when the particle has Xy < -2.0  ( V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2); )
-		for (int j = 1; j <= settings.NUM_POINTS; ++j) {
-
-			if (X(j, 2) < -2.0f) {
-				V(j, 2) = -1.2f*V(j, 2);
-			}
-		}
 		
 		// Calculate one cycle for the system
 		calculateSimulation(settings, m, X, I, V, Vp, Fk, Fkp, zeros, vec1, vec2, diff);
@@ -220,11 +262,11 @@ int main()
 		//myShader.setFloat("time", time);
 
 		// Insert particle positions in shader
-		myShader.setFloat("positions", positions, 8);
+		myShader.setFloat("positions", positions, num_verts*2);
 
 		// Draw object
 		glBindVertexArray(VAO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, num_verts*3, GL_UNSIGNED_INT, 0);
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
@@ -238,6 +280,14 @@ int main()
 
 	// Clean up all the resources and properly exit the application
 	glfwTerminate();
+
+	// Deallocate vertex and index array for circle
+	delete[] circleVertices;
+	circleVertices = nullptr;
+
+	delete[] circleIndices;
+	circleIndices = nullptr;
+
 	return 0;
 }
 
@@ -302,4 +352,14 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 	V = V + (Vp * s.h); /* MATLAB: V = V + h * Vp */
 	Fk = Fk + (Fkp * s.h); /* MATLAB: Fk = Fk + h * Fkp */
 	X = X + (V * s.h); /* MATLAB: X = X + h * V */
+
+
+	 // Code that flips Y - ward velocity when the particle has Xy < -2.0  ( V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2); )
+	for (int j = 1; j <= s.NUM_POINTS; ++j) {
+
+		if (X(j, 2) < -4.0f) {
+			V(j, 2) = -0.2f*V(j, 2);
+			X(j, 2) = -4.0f;
+		}
+	}
 }
