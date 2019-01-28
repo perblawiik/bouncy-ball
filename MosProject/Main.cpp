@@ -19,6 +19,7 @@ struct Settings
 	GLfloat k; // Spring constant
 	GLfloat b; // Resistance constant
 	GLfloat g; // Gravitation constant
+	GLfloat bounciness; // Coefficient for reflected velocity
 
 	GLint NUM_BONDS;
 	GLint NUM_POINTS;
@@ -157,7 +158,7 @@ int main()
 	glEnableVertexAttribArray(0);
 
 	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	// Time variable
 	//GLfloat time = (GLfloat)glfwGetTime();
@@ -169,40 +170,39 @@ int main()
 	settings.k = 100.0f; // Spring constant
 	settings.b = 5.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
+	settings.bounciness = 0.2f; // Coefficient for collision velocity
 	settings.NUM_BONDS = num_triangles*2; // Total number of bonds
 	settings.NUM_POINTS = num_verts; // Total number of points (particles)
 	settings.DIM = 2; // 2-D
 
+	// Total weight of the system
 	const float WEIGHT = 2.0f;
 
-	//Masses per particle ( m = [1; 1; 1; 1]; )
-	Matrix m(settings.NUM_POINTS, 1); // Create 4x1 matrix
+	//Masses per particle
+	Matrix m(settings.NUM_POINTS, 1); // Create Nx1 matrix
 	for (int i = 0; i < m.size(); ++i) {
-		m[i] = WEIGHT/(float)settings.NUM_POINTS; // All masses set to 1
+		m[i] = WEIGHT/(float)settings.NUM_POINTS; // All masses divided equally
 	}
 
-	//Particle x, y Pos [Xx Xy] / per particle ( X = [10 10; 20 10; 15 15; 25 15]; )
+	//Particle x, y Pos [Xx Xy] / per particle
 	Matrix X(settings.NUM_POINTS, settings.DIM);
 	for (int i = 0; i < settings.NUM_POINTS; ++i) {
 		X[i * 2] = circleVertices[i * 3];
 		X[i * 2 + 1] = circleVertices[i * 3 + 1];
 	}
-	for (int i = 0; i < X.size(); ++i) {
-		std::cout << X[i] << std::endl;
-	}
 
-	// Particle indices for spring bonds [i1 i2]/ per spring ( I = [1 2; 2 3; 3 4; 4 1; 1 3]; )
 	Matrix I(settings.NUM_BONDS, 2);
 	row = 0;
+	// Set half of the bond indices to (1,2), (2,3), (3,4), (4,5) etc.
 	for ( ; row < settings.NUM_BONDS/2 - 1; ++row) {
 		I[row * 2] = (float)(row + 1);
-		std::cout << I[row * 2] << " ";
 		I[row * 2 + 1] = (float)(row + 2);
-		std::cout << I[row * 2 + 1] << std::endl;
 	}
+	// (n-1, 1)
 	I[row * 2] = (float)(row + 1);
 	I[row * 2 + 1] = 1.0f;
 	++row;
+	// Set other half of the bond indices to (1, n), (2, n), (3, n), (4, n) etc.. where n = middle vertex
 	for (int i = 0 ; i < settings.NUM_BONDS/2; ++i, ++row) {
 		I[row * 2] = (float)(i + 1);
 		I[row * 2 + 1] = (float)settings.NUM_POINTS;
@@ -310,33 +310,34 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 	Vp = zeros; 
 	for (int n = 1; n <= s.NUM_BONDS; ++n) // Loop through the springs
 	{
-		// Get point coordinates based on bond indices I
-		X.copyRow((int)I(n, 1), vec1);
-		X.copyRow((int)I(n, 2), vec2);
+		int index1 = (int)I(n, 1); // Index from point 1
+		int index2 = (int)I(n, 2); // Index from point 2
 
-		// Get vector from point 1 to 2
+		// Get point coordinates based on bond indices I
+		X.copyRow(index1, vec1); // Copy position of point 1 to vec1
+		X.copyRow(index2, vec2); // Copy position of point 2 to vec2
+
+		// Vector from point 1 to 2
 		diff = vec1 - vec2; /* MATLAB: dif = X(I(n, 1), :) - X(I(n, 2), :); */
 
 		// Normalise it, used to give the Fk and Fb direction
 		diff.normalize(); /* MATLAB: nDif = dif / norm(dif); */
 
 		// Get deltaV, speed difference between the particles in the spring's direction
-		V.copyRow((int)I(n, 1), vec1);
-		V.copyRow((int)I(n, 2), vec2);
+		V.copyRow(index1, vec1); // Copy velocity of point 1 to vec1
+		V.copyRow(index2, vec2); // Copy velocity of point 2 to vec2
 		float dV = diff.dot(vec1 - vec2); /* MATLAB: dV = dot(V(I(n, 1), :) - V(I(n, 2), :), nDif); */
 
 		// Apply spring influence to the connected particles, 
 		// first one (Vp1) is added, second is subtracted, in the springs direction since they will be either
 		// both pulled towards eachother or drawn away from eachother.
-		Vp.copyRow((int)I(n, 1), vec1);
-		Vp.copyRow((int)I(n, 2), vec2);
-		float m1 = m((int)I(n, 1), 1); // Mass of point 1
-		float m2 = m((int)I(n, 2), 1); // Mass of point 2
+		Vp.copyRow(index1, vec1); // Copy acceleration of point 1 to vec1
+		Vp.copyRow(index2, vec2); // Copy acceleration of point 2 to vec2
+		float m1 = m(index1, 1); // Mass of point 1
+		float m2 = m(index2, 1); // Mass of point 2
 		float F = Fk(n, 1); // Spring force
-		diff = diff * (1 / m1) * (s.b*dV + F);
-
-		Vp.replaceRow((int)I(n, 1), vec1 - diff); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */
-		Vp.replaceRow((int)I(n, 2), vec2 + diff); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */
+		Vp.replaceRow(index1, vec1 - (diff * (1.0f / m1) * (s.b*dV + F))); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */
+		Vp.replaceRow(index2, vec2 + (diff * (1.0f / m2) * (s.b*dV + F))); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */
 
 		// The derivative for Fk
 		Fkp(n, 1) = s.k * dV; /* MATLAB: Fkp(n) = k * dV; */
@@ -353,12 +354,11 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 	Fk = Fk + (Fkp * s.h); /* MATLAB: Fk = Fk + h * Fkp */
 	X = X + (V * s.h); /* MATLAB: X = X + h * V */
 
-
-	 // Code that flips Y - ward velocity when the particle has Xy < -2.0  ( V(:, 2) = (X(:, 2)>0).*V(:, 2) - (X(:, 2)<0).*V(:, 2); )
+	 // Code that flips Y - ward velocity when the particle has Xy < -4.0 
 	for (int j = 1; j <= s.NUM_POINTS; ++j) {
 
 		if (X(j, 2) < -4.0f) {
-			V(j, 2) = -0.2f*V(j, 2);
+			V(j, 2) = -s.bounciness*V(j, 2);
 			X(j, 2) = -4.0f;
 		}
 	}
