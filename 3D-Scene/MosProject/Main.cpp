@@ -86,7 +86,7 @@ int main()
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
-	mat4Translate(MV, -1.0f, 0.0f, -5.0f);
+	mat4Translate(MV, 0.0f, 0.0f, -10.0f);
 	// Perspective matrix
 	GLfloat P[16] = {
 
@@ -98,6 +98,11 @@ int main()
 	mat4Perspective(P, 3.14159265359f / 3, 1.0f, 0.1f, 100.0f);
 
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
+
+
+
+	// Particle positions per cycle (passed into the shader)
+	GLfloat positions[18] = { 0.0f };
 
 	int rowSize = 6;
 	GLfloat vertices[] = {
@@ -161,8 +166,75 @@ int main()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
+	/**********S I M U L A T I O N**********/
+
+	Settings settings = {};
+	settings.h = 0.001f; // Step
+	settings.k = 100.0f; // Spring constant
+	settings.b = 5.0f; // Resistance constant
+	settings.g = 9.82f; // Gravitation constant
+	settings.bounciness = 0.2f; // Coefficient for collision velocity
+	settings.NUM_BONDS = 12; // Total number of bonds
+	settings.NUM_POINTS = numVertices; // Total number of points (particles)
+	settings.DIM = 3; // 2-D
+
+	// Total weight of the system
+	const float WEIGHT = 1.0f;
+
+	//Masses per particle
+	Matrix m(settings.NUM_POINTS, 1); // Create Nx1 matrix
+	for (int i = 0; i < m.size(); ++i) {
+		m[i] = WEIGHT / (float)settings.NUM_POINTS; // All masses divided equally
+	}
+
+	//Particle x, y Pos [Xx Xy] / per particle
+	Matrix X(settings.NUM_POINTS, settings.DIM);
+	for (int i = 0; i < settings.NUM_POINTS; ++i) {
+		X[i * settings.DIM] = vertices[i * rowSize];
+		X[i * settings.DIM + 1] = vertices[i * rowSize + 1];
+		X[i * settings.DIM + 2] = vertices[i * rowSize + 2];
+	}
+
+	Matrix I(settings.NUM_BONDS, 2);
+	I(1, 1) = 1; I(1, 2) = 2;
+	I(2, 1) = 2; I(2, 2) = 6;
+	I(3, 1) = 6; I(3, 2) = 4;
+	I(4, 1) = 4; I(4, 2) = 1;
+	I(5, 1) = 1; I(5, 2) = 3;
+	I(6, 1) = 3; I(6, 2) = 6;
+	I(7, 1) = 6; I(7, 2) = 5;
+	I(8, 1) = 5; I(8, 2) = 1;
+	I(9, 1) = 2; I(9, 2) = 3;
+	I(10, 1) = 3; I(10, 2) = 4;
+	I(11, 1) = 4; I(11, 2) = 5;
+	I(12, 1) = 5; I(12, 2) = 2;
+
+	// Starting velocity [Vx Vy]/ per particle
+	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
+
+	// Acceleration dV/dt 
+	Matrix Vp(settings.NUM_POINTS, settings.DIM); // All set to zero by default
+
+	// Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation) 
+	Matrix Fk(settings.NUM_BONDS, settings.DIM); // All set to zero by default
+
+	// Fkp = dFp/dt
+	Matrix Fkp(settings.NUM_BONDS, settings.DIM); // All set to zero by default
+
+	// Used to set Vp to zero each cycle
+	Matrix zeros(settings.NUM_POINTS, settings.DIM);
+
+	// Dummy vectors (1xDIM matrix)
+	Matrix vec1(1, settings.DIM);
+	Matrix vec2(1, settings.DIM);
+
+	// Vector from point 1 to point 2;
+	Matrix diff(1, settings.DIM);
+
+	/***************************************/
+
 	// Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	/***************************************/
 
@@ -176,17 +248,27 @@ int main()
 		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		/**********S I M U L A T I O N**********/
+		//-------------------------------------//
+
+		// Calculate one cycle for the system
+		calculateSimulation(settings, m, X, I, V, Vp, Fk, Fkp, zeros, vec1, vec2, diff);
+
+		// Update particle positions
+		X.copyValues(positions);
+
+		//-------------------------------------//
+		/***************************************/
+
 		// Activate shader
 		myShader.use();
-
-		// Update time and pass in to the shader
-		//time = (GLfloat)glfwGetTime();
-		//myShader.setFloat("time", time);
 
 		// Model View Matrix
 		myShader.setFloatMat4("MV", MV);
 		 // Projection Matrix
 		myShader.setFloatMat4("P", P);
+		// Insert particle positions in shader
+		myShader.setFloat("positions", positions, numVertices * 3);
 
 		// Draw object
 		glBindVertexArray(VAO);
@@ -242,15 +324,15 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 		X.copyRow(index2, vec2); // Copy position of point 2 to vec2
 
 		// Vector from point 1 to 2
-		diff = vec1 - vec2; /* MATLAB: dif = X(I(n, 1), :) - X(I(n, 2), :); */
+		diff = vec1 - vec2; 
 
 		// Normalise it, used to give the Fk and Fb direction
-		diff.normalize(); /* MATLAB: nDif = dif / norm(dif); */
+		diff.normalize();
 
 		// Get deltaV, speed difference between the particles in the spring's direction
 		V.copyRow(index1, vec1); // Copy velocity of point 1 to vec1
 		V.copyRow(index2, vec2); // Copy velocity of point 2 to vec2
-		float dV = diff.dot(vec1 - vec2); /* MATLAB: dV = dot(V(I(n, 1), :) - V(I(n, 2), :), nDif); */
+		float dV = diff.dot(vec1 - vec2);
 
 		// Apply spring influence to the connected particles, 
 		// first one (Vp1) is added, second is subtracted, in the springs direction since they will be either
@@ -260,29 +342,30 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 		float m1 = m(index1, 1); // Mass of point 1
 		float m2 = m(index2, 1); // Mass of point 2
 		float F = Fk(n, 1); // Spring force
-		Vp.replaceRow(index1, vec1 - (diff * (1.0f / m1) * (s.b*dV + F))); /* MATLAB: Vp(I(n, 1), :) = Vp(I(n, 1), :) - 1 / m(I(n, 1)) * (b*dV + Fk(n))*nDif; */
-		Vp.replaceRow(index2, vec2 + (diff * (1.0f / m2) * (s.b*dV + F))); /* MATLAB: Vp(I(n, 2), :) = Vp(I(n, 2), :) + 1 / m(I(n, 2)) * (b*dV + Fk(n))*nDif; */
+		Vp.replaceRow(index1, vec1 - (diff * (1.0f / m1) * (s.b*dV + F))); 
+		Vp.replaceRow(index2, vec2 + (diff * (1.0f / m2) * (s.b*dV + F)));
 
 		// The derivative for Fk
-		Fkp(n, 1) = s.k * dV; /* MATLAB: Fkp(n) = k * dV; */
+		Fkp(n, 1) = s.k * dV;
 	}
 
 	// Add gravity for all points (-g to y coordinate)
-	for (int r = 1; r <= s.NUM_POINTS; ++r) { /* MATLAB: Vp = Vp - [0 g]; */
+	
+	for (int r = 1; r <= s.NUM_POINTS; ++r) { 
 		Vp(r, 2) = Vp(r, 2) - s.g;
 	}
-
+	
 	// Approximating the new values using: X_n + 1 = X_n + h * X'_n
 	// (they're not supressed for debugging purposes)
-	V = V + (Vp * s.h); /* MATLAB: V = V + h * Vp */
-	Fk = Fk + (Fkp * s.h); /* MATLAB: Fk = Fk + h * Fkp */
-	X = X + (V * s.h); /* MATLAB: X = X + h * V */
+	V = V + (Vp * s.h);
+	Fk = Fk + (Fkp * s.h);
+	X = X + (V * s.h);
 
 	 // Code that flips Y - ward velocity when the particle has Xy < -4.0 
 	for (int j = 1; j <= s.NUM_POINTS; ++j) {
 
 		if (X(j, 2) < -4.0f) {
-			V(j, 2) = -s.bounciness*V(j, 2);
+			V(j, 2) = 0.0f;
 			X(j, 2) = -4.0f;
 		}
 	}
