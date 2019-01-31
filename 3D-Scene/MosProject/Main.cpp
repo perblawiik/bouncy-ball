@@ -10,6 +10,7 @@
 /** CONSTANTS **/
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+const GLfloat PI = 3.14159265359f;
 
 /** STRUCTS **/
 // Struct with all constant values for the simulation
@@ -95,14 +96,16 @@ int main()
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
-	mat4Perspective(P, 3.14159265359f / 3, 1.0f, 0.1f, 100.0f);
+	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 100.0f);
 
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
 	// Particle positions per cycle (passed into the shader)
 	GLfloat positions[18] = { 0.0f };
 
-	int rowSize = 6;
+	// Columns per row in the vertex array (coordinates + normals)
+	int stride = 6;
+
 	GLfloat vertices[] = {
 		// Coordinates        Normal
 		0.0f, -1.0f,  0.0f,   0.0f, -1.0f,  0.0f, // Vertex 1
@@ -126,6 +129,108 @@ int main()
 	};
 	int numTriangles = 8;
 
+	
+	int numHorizontalSegments = 4;
+	int numVerticalSegments = 2 * numHorizontalSegments;
+	int numVerts = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
+	std::cout << "numVerts: " << numVerts << std::endl;
+	int numTris = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
+	std::cout << "numTris: " << numTris << std::endl;
+	
+	GLfloat *sphereVertices = new GLfloat[numVerts * stride]; // Initialize vertex array
+	GLuint *sphereIndices = new GLuint[numTris * 3]; // Initialize index array
+
+	/** Generate vertex array **/
+	// Bottom vertex
+	sphereVertices[0] = 0.0f; sphereVertices[1] = -1.0f; sphereVertices[2] = 0.0f; // Coordinates
+	sphereVertices[3] = 0.0f; sphereVertices[4] = -1.0f; sphereVertices[5] = 0.0f; // Normal
+
+	GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
+	GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
+	GLfloat phi = 0; // Begin at Z = 0 (Z € 0 < phi < 2PI )
+
+	// Generate middle part vertices with normals
+	int index = 5; // Skip first 6 (the bottom vertex with normal already specified)
+	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
+
+		float Y = cos(theta); // Y-coordinate
+		float R = sin(theta); // radius
+
+		for (int j = 0; j < numVerticalSegments; ++j) {
+			// Vertex (x, y, z)
+			sphereVertices[++index] = R * sin(phi);
+			sphereVertices[++index] = Y;
+			sphereVertices[++index] = R * cos(phi);
+			// Normal (x, y, z)
+			sphereVertices[++index] = R * sin(phi);
+			sphereVertices[++index] = Y;
+			sphereVertices[++index] = R * cos(phi);
+
+			phi += sampleRate;
+		}
+		theta += sampleRate;
+	}
+
+	// Top vertex
+	sphereVertices[++index] = 0.0f; sphereVertices[++index] = 1.0f; sphereVertices[++index] = 0.0f;
+	sphereVertices[++index] = 0.0f; sphereVertices[++index] = 1.0f; sphereVertices[++index] = 0.0f;
+	
+	/** Generate index array */
+	// Bottom cap
+	index = -1;
+	for (int i = 0; i < numVerticalSegments; ++i) {
+
+		sphereIndices[++index] = 0;
+
+		if ((i + 2) <= numVerticalSegments) {
+			sphereIndices[++index] = i + 2;
+		}
+		else {
+			sphereIndices[++index] = (i + 2) - numVerticalSegments;
+		}
+		sphereIndices[++index] = i + 1;
+	}
+	
+	
+	// Middle part
+	int v0 = 1;
+	for (int i = 0; i < numHorizontalSegments - 2; i++) {
+		for (int j = 0; j < numVerticalSegments-1; ++j) {
+			// One rectangle at a time (two triangles)
+			sphereIndices[++index] = v0;
+			sphereIndices[++index] = v0 + 1;
+			sphereIndices[++index] = numVerticalSegments + v0;
+			sphereIndices[++index] = v0 + 1;
+			sphereIndices[++index] = numVerticalSegments + v0 + 1;
+			sphereIndices[++index] = numVerticalSegments + v0;
+			++v0;
+		}
+		sphereIndices[++index] = v0;
+		sphereIndices[++index] = (v0 + 1) - numVerticalSegments;
+		sphereIndices[++index] = numVerticalSegments + v0;
+		sphereIndices[++index] = (v0 + 1) - numVerticalSegments;
+		sphereIndices[++index] = v0 + 1;
+		sphereIndices[++index] = numVerticalSegments + v0;
+		++v0;
+	}
+	
+	
+	// Top cap
+	int lastVertexIndex = numVerts - 1;
+	for (int i = 0; i < numVerticalSegments; ++i) {
+
+		sphereIndices[++index] = lastVertexIndex;
+
+		if ((lastVertexIndex - 2 - i) >= lastVertexIndex - numVerticalSegments) {
+			sphereIndices[++index] = lastVertexIndex - 2 - i;
+		}
+		else {
+			sphereIndices[++index] = lastVertexIndex - numVerticalSegments - 1;
+		}
+
+		sphereIndices[++index] = lastVertexIndex - 1 - i;
+	}
+
 	// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
 	GLuint VBO, VAO, EBO;
 	glGenBuffers(1, &VBO);
@@ -136,10 +241,10 @@ int main()
 	glBindVertexArray(VAO);
 	// 2. Copy our vertices array in a buffer for OpenGL to use
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, rowSize * numVertices * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, stride * numVerts * sizeof(GLfloat), sphereVertices, GL_STATIC_DRAW);
 	// 3. Copy our index array in a element buffer for OpenGL to use
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * numTriangles * sizeof(GLuint), indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * numTris * sizeof(GLuint), sphereIndices, GL_STATIC_DRAW);
 
 	// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
 	// glVertexAttribPointer Parameters :
@@ -152,8 +257,8 @@ int main()
 	//    Since the next set of position data is located exactly 3 times the size of a float away we specify that value as the stride.
 	// 6. This is the offset of where the position data begins in the buffer. 
 	//    Since the position data is at the start of the data array this value is just 0.
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, rowSize * sizeof(GLfloat), (void*)0); // xyz coordinates
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, rowSize * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); // normals
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)0); // Vertex coordinates
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); // normals
 	glEnableVertexAttribArray(0); // Vertex coordinates
 	glEnableVertexAttribArray(1); // Normals
 
@@ -188,9 +293,9 @@ int main()
 	//Particle x, y Pos [Xx Xy] / per particle
 	Matrix X(settings.NUM_POINTS, settings.DIM);
 	for (int i = 0; i < settings.NUM_POINTS; ++i) {
-		X[i * settings.DIM] = vertices[i * rowSize];
-		X[i * settings.DIM + 1] = vertices[i * rowSize + 1];
-		X[i * settings.DIM + 2] = vertices[i * rowSize + 2];
+		X[i * settings.DIM] = vertices[i * stride];
+		X[i * settings.DIM + 1] = vertices[i * stride + 1];
+		X[i * settings.DIM + 2] = vertices[i * stride + 2];
 	}
 
 	Matrix I(settings.NUM_BONDS, 2);
@@ -232,7 +337,9 @@ int main()
 	/***************************************/
 
 	// Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	// Hide the back face of the triangles
+	glEnable(GL_CULL_FACE);
 
 	/***************************************/
 
@@ -271,11 +378,8 @@ int main()
 		// Draw object
 		glBindVertexArray(VAO);
 		// (mode, vertex count, type, element array buffer offset)
-		glDrawElements(GL_TRIANGLES, numTriangles*3, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, numTris * 3, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
-
-		// Hide the back face of the triangles
-		//glEnable(GL_CULL_FACE);
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);

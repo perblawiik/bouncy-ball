@@ -42,5 +42,5 @@ void main()
     shadedColor = Ia*ka + Id*kd* dotNL + Is*ks* pow (dotRV , n);
 
 	// Transform (x,y,z) vertex coordinates with a 4x4 matrix T
-    gl_Position = T * vec4(simulationPos, 1.0);
+    gl_Position = T * vec4(Position, 1.0);
 }
