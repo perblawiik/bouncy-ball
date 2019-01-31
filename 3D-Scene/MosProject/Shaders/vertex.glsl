@@ -2,7 +2,6 @@
 layout (location = 0) in vec3 Position;
 layout (location = 1) in vec3 Normal;
 
-//uniform float time;
 uniform float positions[18];
 uniform mat4 P; // Projection Matrix
 uniform mat4 MV; // Model View Matrix
@@ -10,7 +9,7 @@ uniform mat4 MV; // Model View Matrix
 out vec3 shadedColor;
 
 vec3 viewDirection = vec3(0.0, 0.0, 1.0); // the view direction - (0 ,0 ,1) in view space
-float n = 100.0; // the " shininess " parameter
+float n = 50.0; // the " shininess " parameter
 vec3 ka = vec3(0.0, 0.0, 0.0); // the ambient reflection color
 vec3 Ia = vec3(0.6, 0.6, 0.6); // the ambient illumination color
 vec3 kd = vec3(1.0, 0.5, 0.0); // the diffuse surface reflection color
@@ -25,7 +24,7 @@ void main()
 	float x = positions[vertexId * 3];
 	float y = positions[vertexId * 3 + 1];
 	float z = positions[vertexId * 3 + 2];
-	vec3 pos = vec3(x, y, z);
+	vec3 simulationPos = vec3(x, y, z);
 
 	// Final transformation ( Perspective multiplied with the model view )
     mat4 T = P * MV;
@@ -43,5 +42,5 @@ void main()
     shadedColor = Ia*ka + Id*kd* dotNL + Is*ks* pow (dotRV , n);
 
 	// Transform (x,y,z) vertex coordinates with a 4x4 matrix T
-    gl_Position = T * vec4(pos, 1.0);
+    gl_Position = T * vec4(simulationPos, 1.0);
 }

@@ -99,8 +99,6 @@ int main()
 
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
-
-
 	// Particle positions per cycle (passed into the shader)
 	GLfloat positions[18] = { 0.0f };
 
@@ -174,7 +172,7 @@ int main()
 	settings.b = 5.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
 	settings.bounciness = 0.2f; // Coefficient for collision velocity
-	settings.NUM_BONDS = 12; // Total number of bonds
+	settings.NUM_BONDS = numVertices*2; // Total number of bonds
 	settings.NUM_POINTS = numVertices; // Total number of points (particles)
 	settings.DIM = 3; // 2-D
 
@@ -234,7 +232,7 @@ int main()
 	/***************************************/
 
 	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	/***************************************/
 
@@ -277,9 +275,7 @@ int main()
 		glBindVertexArray(0);
 
 		// Hide the back face of the triangles
-		glEnable(GL_CULL_FACE);
-		//Change the polygon rendering mode for the front so that they are filled.
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//glEnable(GL_CULL_FACE);
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
@@ -299,7 +295,7 @@ int main()
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-	glViewport(0, 0, SCR_WIDTH*(width/height), SCR_HEIGHT*(width/height));
+	glViewport(0, 0, width, height);
 }
 
 void processInput(GLFWwindow* window)
