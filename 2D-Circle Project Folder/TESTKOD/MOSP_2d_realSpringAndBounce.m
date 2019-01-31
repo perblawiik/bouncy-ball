@@ -68,21 +68,31 @@ for cycle=1:CYCLES -1
     V  = V  + h*Vp;
     X  = X  + h*V;
     
-    % is any node below y=0?
-    if (sum(X(:,2)<0) > 0)
-        % find values below y=0
-        IndeciesBelow0 = find(X(:, 2)<0);
+    % The considered line
+    line = [-1 1 20];
+    normal = [-1*line(2) line(1)];
+    normal = normal/norm(normal);
+    
+    % Each points' distance to the line
+    distanceFromLine = (X(:,1)* line(1) + X(:,2)*line(2) + line(3))/(line(1).^2+line(2).^2 );
+    % The indicies of the points below the line
+    IndeciesBelowLine = find(distanceFromLine<0);
+    
+    % Check if there are any points below the line
+    if (isempty(IndeciesBelowLine)== 0)
         
-        % find smallest value
-        [minY, ~] = min(X(:, 2));
+        % Find the distance of the point that is the furthest below the
+        % line
+        [minDistance, ~] = min(distanceFromLine);
         
         % flip velocities of those below
-        for n = 1:length(IndeciesBelow0)
-            V(IndeciesBelow0(n), 2) = abs(V(IndeciesBelow0(n), 2) *fBounce);
+        for n = 1:length(IndeciesBelowLine)
+            V(IndeciesBelowLine(n), :) = 0; % normal * norm(V(IndeciesBelowLine(n), :) *fBounce);
         end
         % Nudge all particles with the lowest particle's y
-        X(:, 2) = X(:, 2) - minY ;
-        
+        for n = 1:size(X, 1)
+            X(n, :) = X(n, :) - normal * minDistance ;
+        end
     end
     
     animation(:,:,cycle + 1) = X;
@@ -93,7 +103,7 @@ end
 for i = 1:CYCLES
     clf;
     hold on;
-    plot([-50 50], [0 0]); 
+    plot([0 50], [-20 30]); 
     plot(animation(:,1,i),animation(:,2,i),'ro')
     for n = 1:BONDS 
         plot([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)],'b--');
