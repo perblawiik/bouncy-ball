@@ -74,12 +74,12 @@
     <LibraryPath>Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>Libraries\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>Libraries\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Include;$(IncludePath)</IncludePath>

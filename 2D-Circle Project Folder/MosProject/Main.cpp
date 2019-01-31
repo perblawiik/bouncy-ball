@@ -168,7 +168,7 @@ int main()
 	Settings settings = {};
 	settings.h = 0.001f; // Step
 	settings.k = 100.0f; // Spring constant
-	settings.b = 5.0f; // Resistance constant
+	settings.b = 3.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
 	settings.bounciness = 0.2f; // Coefficient for collision velocity
 	settings.NUM_BONDS = num_triangles*2; // Total number of bonds
@@ -358,7 +358,7 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 	for (int j = 1; j <= s.NUM_POINTS; ++j) {
 
 		if (X(j, 2) < -4.0f) {
-			V(j, 2) = -s.bounciness*V(j, 2);
+			V(j, 2) = 0.0f;
 			X(j, 2) = -4.0f;
 		}
 	}

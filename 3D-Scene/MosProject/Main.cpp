@@ -86,7 +86,7 @@ int main()
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
-	mat4Translate(MV, 0.0f, 0.0f, -5.0f);
+	mat4Translate(MV, -1.0f, 0.0f, -5.0f);
 	// Perspective matrix
 	GLfloat P[16] = {
 
@@ -162,7 +162,7 @@ int main()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	/***************************************/
 
@@ -197,7 +197,7 @@ int main()
 		// Hide the back face of the triangles
 		glEnable(GL_CULL_FACE);
 		//Change the polygon rendering mode for the front so that they are filled.
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
