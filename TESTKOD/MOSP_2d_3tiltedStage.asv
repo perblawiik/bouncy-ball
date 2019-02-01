@@ -124,18 +124,14 @@ for cycle=1:CYCLES -1
                     end
                 end  
             end
-            % 
-            IndiciesInContact = zeros(1, countIndiciesInContact);
+            IndiciesInContact = zeros(countIndiciesInContact);
             for inContact = 1:countIndiciesInContact
                 IndiciesInContact(inContact) = tempIndiciesInContact(inContact);
             end
-            IndiciesInContact= IndiciesInContact';
         end
         % Check if there are any points below the line
         if (countIndiciesInContact ~= 0)
-            % For each point below the ledge...
             for n = 1:length(IndiciesInContact)
-                % flip velocities of those below
                 V(IndiciesInContact(n), :) = (V(IndiciesInContact(n), :) - normalV*dot(V(IndiciesInContact(n), :), normalV))*1.0; % normal * norm(V(IndeciesBelowLine(n), :) *fBounce);
             
                 % Nudge all particles below the line to the line
