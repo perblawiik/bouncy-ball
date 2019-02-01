@@ -350,7 +350,8 @@ int main()
 	// Hide the back face of the triangles
 	glEnable(GL_CULL_FACE);
 
-	/***************************************/
+	// Time variable
+	GLfloat time = (GLfloat)glfwGetTime();
 
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
@@ -376,6 +377,10 @@ int main()
 
 		// Activate shader
 		myShader.use();
+
+		// Update time and pass in to the shader
+		time = (GLfloat)glfwGetTime();
+		myShader.setFloat("time", time);
 
 		// Model View Matrix
 		myShader.setFloatMat4("MV", MV);
