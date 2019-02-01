@@ -2,7 +2,7 @@
 layout (location = 0) in vec3 Position;
 layout (location = 1) in vec3 Normal;
 
-uniform float positions[18];
+uniform float positions[342];
 uniform mat4 P; // Projection Matrix
 uniform mat4 MV; // Model View Matrix
 

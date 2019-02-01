@@ -20,7 +20,7 @@ struct Settings
 	GLfloat k; // Spring constant
 	GLfloat b; // Resistance constant
 	GLfloat g; // Gravitation constant
-	GLfloat bounciness; // Coefficient for reflected velocity
+	GLfloat SPHERE_RADIUS; // Radius of the bouncy ball
 
 	GLint NUM_BONDS;
 	GLint NUM_POINTS;
@@ -87,7 +87,7 @@ int main()
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
-	mat4Translate(MV, 0.0f, 0.0f, -10.0f);
+	mat4Translate(MV, 0.0f, 0.0f, -30.0f);
 	// Perspective matrix
 	GLfloat P[16] = {
 
@@ -101,49 +101,28 @@ int main()
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
 	// Particle positions per cycle (passed into the shader)
-	GLfloat positions[18] = { 0.0f };
+	GLfloat positions[342] = { 0.0f };
 
 	// Columns per row in the vertex array (coordinates + normals)
 	int stride = 6;
-
-	GLfloat vertices[] = {
-		// Coordinates        Normal
-		0.0f, -1.0f,  0.0f,   0.0f, -1.0f,  0.0f, // Vertex 1
-		1.0f,  0.0f,  0.0f,   1.0f,  0.0f,  0.0f, // Vertex 2
-		0.0f,  0.0f, -1.0f,   0.0f,  0.0f, -1.0f, // Vertex 3
-	   -1.0f,  0.0f,  0.0f,  -1.0f,  0.0f,  0.0f, // Vertex 4 
-		0.0f,  0.0f,  1.0f,   0.0f,  0.0f,  1.0f, // Vertex 5
-		0.0f,  1.0f,  0.0f,   0.0f,  1.0f,  0.0f  // Vertex 6
-	};
-	int numVertices = 6;
-
-	GLuint indices[] = {
-		0, 1, 4, // Triangle 1
-		0, 2, 1, // Triangle 2
-		0, 3, 2, // Triangle 3
-		0, 4, 3, // Triangle 4
-		5, 1, 2, // Triangle 5
-		5, 2, 3, // Triangle 6
-		5, 3, 4, // Triangle 7
-		5, 4, 1  // Triangle 8
-	};
-	int numTriangles = 8;
-
 	
-	int numHorizontalSegments = 4;
+	// Number of horizontal segments of the sphere (2 is minimum)
+	int numHorizontalSegments = 8;
 	int numVerticalSegments = 2 * numHorizontalSegments;
-	int numVerts = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
-	std::cout << "numVerts: " << numVerts << std::endl;
-	int numTris = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
-	std::cout << "numTris: " << numTris << std::endl;
+	int numVertices = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
+	std::cout << "numVerts: " << numVertices << std::endl;
+	int numTriangles = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
+	std::cout << "numTris: " << numTriangles << std::endl;
+	std::cout << "Vertex array size: " << 3 * numVertices << std::endl;
 	
-	GLfloat *sphereVertices = new GLfloat[numVerts * stride]; // Initialize vertex array
-	GLuint *sphereIndices = new GLuint[numTris * 3]; // Initialize index array
+	GLfloat *vertices = new GLfloat[numVertices * stride]; // Initialize vertex array
+	GLuint *indices = new GLuint[numTriangles * 3]; // Initialize index array
+	GLfloat radius = 4.0f;
 
 	/** Generate vertex array **/
 	// Bottom vertex
-	sphereVertices[0] = 0.0f; sphereVertices[1] = -1.0f; sphereVertices[2] = 0.0f; // Coordinates
-	sphereVertices[3] = 0.0f; sphereVertices[4] = -1.0f; sphereVertices[5] = 0.0f; // Normal
+	vertices[0] = 0.0f; vertices[1] = -radius; vertices[2] = 0.0f; // Coordinates
+	vertices[3] = 0.0f; vertices[4] = -radius; vertices[5] = 0.0f; // Normal
 
 	GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
 	GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
@@ -153,18 +132,18 @@ int main()
 	int index = 5; // Skip first 6 (the bottom vertex with normal already specified)
 	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
 
-		float Y = cos(theta); // Y-coordinate
-		float R = sin(theta); // radius
+		float Y = radius*cos(theta); // Y-coordinate
+		float R = radius*sin(theta); // radius
 
 		for (int j = 0; j < numVerticalSegments; ++j) {
 			// Vertex (x, y, z)
-			sphereVertices[++index] = R * sin(phi);
-			sphereVertices[++index] = Y;
-			sphereVertices[++index] = R * cos(phi);
+			vertices[++index] = R * sin(phi);
+			vertices[++index] = Y;
+			vertices[++index] = R * cos(phi);
 			// Normal (x, y, z)
-			sphereVertices[++index] = R * sin(phi);
-			sphereVertices[++index] = Y;
-			sphereVertices[++index] = R * cos(phi);
+			vertices[++index] = R * sin(phi);
+			vertices[++index] = Y;
+			vertices[++index] = R * cos(phi);
 
 			phi += sampleRate;
 		}
@@ -172,23 +151,23 @@ int main()
 	}
 
 	// Top vertex
-	sphereVertices[++index] = 0.0f; sphereVertices[++index] = 1.0f; sphereVertices[++index] = 0.0f;
-	sphereVertices[++index] = 0.0f; sphereVertices[++index] = 1.0f; sphereVertices[++index] = 0.0f;
+	vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f;
+	vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f;
 	
 	/** Generate index array */
 	// Bottom cap
 	index = -1;
 	for (int i = 0; i < numVerticalSegments; ++i) {
 
-		sphereIndices[++index] = 0;
+		indices[++index] = 0;
 
 		if ((i + 2) <= numVerticalSegments) {
-			sphereIndices[++index] = i + 2;
+			indices[++index] = i + 2;
 		}
 		else {
-			sphereIndices[++index] = (i + 2) - numVerticalSegments;
+			indices[++index] = (i + 2) - numVerticalSegments;
 		}
-		sphereIndices[++index] = i + 1;
+		indices[++index] = i + 1;
 	}
 	
 	
@@ -197,38 +176,38 @@ int main()
 	for (int i = 0; i < numHorizontalSegments - 2; i++) {
 		for (int j = 0; j < numVerticalSegments-1; ++j) {
 			// One rectangle at a time (two triangles)
-			sphereIndices[++index] = v0;
-			sphereIndices[++index] = v0 + 1;
-			sphereIndices[++index] = numVerticalSegments + v0;
-			sphereIndices[++index] = v0 + 1;
-			sphereIndices[++index] = numVerticalSegments + v0 + 1;
-			sphereIndices[++index] = numVerticalSegments + v0;
+			indices[++index] = v0;
+			indices[++index] = v0 + 1;
+			indices[++index] = numVerticalSegments + v0;
+			indices[++index] = v0 + 1;
+			indices[++index] = numVerticalSegments + v0 + 1;
+			indices[++index] = numVerticalSegments + v0;
 			++v0;
 		}
-		sphereIndices[++index] = v0;
-		sphereIndices[++index] = (v0 + 1) - numVerticalSegments;
-		sphereIndices[++index] = numVerticalSegments + v0;
-		sphereIndices[++index] = (v0 + 1) - numVerticalSegments;
-		sphereIndices[++index] = v0 + 1;
-		sphereIndices[++index] = numVerticalSegments + v0;
+		indices[++index] = v0;
+		indices[++index] = (v0 + 1) - numVerticalSegments;
+		indices[++index] = numVerticalSegments + v0;
+		indices[++index] = (v0 + 1) - numVerticalSegments;
+		indices[++index] = v0 + 1;
+		indices[++index] = numVerticalSegments + v0;
 		++v0;
 	}
 	
 	
 	// Top cap
-	int lastVertexIndex = numVerts - 1;
+	int lastVertexIndex = numVertices - 1;
 	for (int i = 0; i < numVerticalSegments; ++i) {
 
-		sphereIndices[++index] = lastVertexIndex;
+		indices[++index] = lastVertexIndex;
 
 		if ((lastVertexIndex - 2 - i) >= lastVertexIndex - numVerticalSegments) {
-			sphereIndices[++index] = lastVertexIndex - 2 - i;
+			indices[++index] = lastVertexIndex - 2 - i;
 		}
 		else {
-			sphereIndices[++index] = lastVertexIndex - numVerticalSegments - 1;
+			indices[++index] = lastVertexIndex - numVerticalSegments - 1;
 		}
 
-		sphereIndices[++index] = lastVertexIndex - 1 - i;
+		indices[++index] = lastVertexIndex - 1 - i;
 	}
 
 	// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
@@ -273,16 +252,16 @@ int main()
 
 	Settings settings = {};
 	settings.h = 0.001f; // Step
-	settings.k = 100.0f; // Spring constant
-	settings.b = 5.0f; // Resistance constant
+	settings.k = 6000.0f; // Spring constant
+	settings.b = 10.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.bounciness = 0.2f; // Coefficient for collision velocity
-	settings.NUM_BONDS = numVertices*2; // Total number of bonds
+	settings.NUM_BONDS = (2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments; // Total number of bonds
 	settings.NUM_POINTS = numVertices; // Total number of points (particles)
 	settings.DIM = 3; // 2-D
+	settings.SPHERE_RADIUS = radius;
 
 	// Total weight of the system
-	const float WEIGHT = 1.0f;
+	const float WEIGHT = 4.0f;
 
 	//Masses per particle
 	Matrix m(settings.NUM_POINTS, 1); // Create Nx1 matrix
@@ -298,75 +277,49 @@ int main()
 		X[i * settings.DIM + 2] = vertices[i * stride + 2];
 	}
 
+	std::cout << "Number of springs: " << settings.NUM_BONDS << std::endl;
 	Matrix I(settings.NUM_BONDS, 2);
-	I(1, 1) = 1; I(1, 2) = 2;
-	I(2, 1) = 2; I(2, 2) = 6;
-	I(3, 1) = 6; I(3, 2) = 4;
-	I(4, 1) = 4; I(4, 2) = 1;
-	I(5, 1) = 1; I(5, 2) = 3;
-	I(6, 1) = 3; I(6, 2) = 6;
-	I(7, 1) = 6; I(7, 2) = 5;
-	I(8, 1) = 5; I(8, 2) = 1;
-	I(9, 1) = 2; I(9, 2) = 3;
-	I(10, 1) = 3; I(10, 2) = 4;
-	I(11, 1) = 4; I(11, 2) = 5;
-	I(12, 1) = 5; I(12, 2) = 2;
-
-	int H_SEGS = 2;
-	int V_SEGS = 2 * H_SEGS;
-	int NUM_VERTS = 1 + (H_SEGS - 1) * V_SEGS + 1;
-	int SIZE = (2 * H_SEGS * V_SEGS) - V_SEGS;
-	Matrix I_2(SIZE, 2);
 
 	index = 1;
-	for (int i = 0; i < H_SEGS-1; ++i) {
-		
-		int n = (i * V_SEGS) + 1;
-		for (int j = 0; j < V_SEGS-1; ++j) {
+	// Generate horizontal spring bond relations between the particles 
+	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
 
-			I_2(index, 1) = (float)(n + j);
-			I_2(index, 2) = (float)(n + j + 1);
+		int n = (i * numVerticalSegments) + 2;
+		for (int j = 0; j < numVerticalSegments - 1; ++j) {
+			I(index, 1) = (float)(n + j);
+			I(index, 2) = (float)(n + j + 1);
 			++index;
-			std::cout << n + j << " " << n + j + 1 << std::endl;
 		}
-		I_2(index, 1) = I_2((index - 1), 2);
-		I_2(index, 2) = (float)n;
+		I(index, 1) = I((index - 1), 2);
+		I(index, 2) = (float)n;
 		++index;
-		std::cout << I_2(index - 2, 2) << " " << n << "\n\n\n";
 	}
 
-	for (int i = 1; i <= V_SEGS; ++i) {
+	// Generate vertical spring bond relations between the particles 
+	for (int i = 1; i <= numVerticalSegments; ++i) {
 
 		int n = 1;
 		int m = (n + i);
-		// Bottom
-		I_2(index, 1) = (float)n;
-		I_2(index, 2) = (float)(n + i);
-		std::cout << I_2(index, 1) << " " << I_2(index, 2) << std::endl;
+
+		// Bottom part
+		I(index, 1) = (float)n;
+		I(index, 2) = (float)m;
 		++index;
 
-		// Middle
-		for (int j = 0; j < H_SEGS-2; ++j) {
+		// Middle part
+		for (int j = 0; j < numHorizontalSegments -2; ++j) {
 
-			I_2(index, 1) = (float)m;
-			I_2(index, 2) = (float)m + V_SEGS;
-			std::cout << I_2(index, 1) << " " << I_2(index, 2) << std::endl;
-
+			I(index, 1) = (float)m;
+			I(index, 2) = (float)m + numVerticalSegments;
 			++index;
-			m = m + V_SEGS;
+			m = m + numVerticalSegments;
 		}
 
-		// Top
-		I_2(index, 1) = (float)m;
-		I_2(index, 2) = (float)NUM_VERTS;
-		std::cout << I_2(index, 1) << " " << I_2(index, 2) << std::endl;
+		// Top part
+		I(index, 1) = (float)m;
+		I(index, 2) = (float)numVertices;
 		++index;
-
-		std::cout << "\n\n\n";
 	}
-	std::cout << index << std::endl;
-	std::cout << 2*H_SEGS*V_SEGS - V_SEGS << std::endl;
-
 
 	// Starting velocity [Vx Vy]/ per particle
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
@@ -519,10 +472,10 @@ void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Mat
 
 	 // Code that flips Y - ward velocity when the particle has Xy < -4.0 
 	for (int j = 1; j <= s.NUM_POINTS; ++j) {
-
-		if (X(j, 2) < -4.0f) {
+		 
+		if (X(j, 2) < (-s.SPHERE_RADIUS * 2)) {
 			V(j, 2) = 0.0f;
-			X(j, 2) = -4.0f;
+			X(j, 2) = -s.SPHERE_RADIUS * 2;
 		}
 	}
 }
