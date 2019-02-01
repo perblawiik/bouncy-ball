@@ -87,7 +87,7 @@ int main()
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
-	mat4Translate(MV, 0.0f, 0.0f, -30.0f);
+	mat4Translate(MV, 0.0f, 0.0f, -100.0f);
 	// Perspective matrix
 	GLfloat P[16] = {
 
@@ -96,7 +96,7 @@ int main()
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
-	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 100.0f);
+	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f);
 
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
@@ -117,7 +117,7 @@ int main()
 	
 	GLfloat *vertices = new GLfloat[numVertices * stride]; // Initialize vertex array
 	GLuint *indices = new GLuint[numTriangles * 3]; // Initialize index array
-	GLfloat radius = 4.0f;
+	GLfloat radius = 20.0f;
 
 	/** Generate vertex array **/
 	// Bottom vertex
@@ -252,7 +252,7 @@ int main()
 
 	Settings settings = {};
 	settings.h = 0.001f; // Step
-	settings.k = 6000.0f; // Spring constant
+	settings.k = 5000.0f; // Spring constant
 	settings.b = 10.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
 	settings.NUM_BONDS = (2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments; // Total number of bonds
@@ -261,7 +261,7 @@ int main()
 	settings.SPHERE_RADIUS = radius;
 
 	// Total weight of the system
-	const float WEIGHT = 4.0f;
+	const float WEIGHT = 5.0f;
 
 	//Masses per particle
 	Matrix m(settings.NUM_POINTS, 1); // Create Nx1 matrix
