@@ -241,10 +241,10 @@ int main()
 	glBindVertexArray(VAO);
 	// 2. Copy our vertices array in a buffer for OpenGL to use
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, stride * numVerts * sizeof(GLfloat), sphereVertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, stride * numVertices * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
 	// 3. Copy our index array in a element buffer for OpenGL to use
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * numTris * sizeof(GLuint), sphereIndices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * numTriangles * sizeof(GLuint), indices, GL_STATIC_DRAW);
 
 	// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
 	// glVertexAttribPointer Parameters :
@@ -312,6 +312,62 @@ int main()
 	I(11, 1) = 4; I(11, 2) = 5;
 	I(12, 1) = 5; I(12, 2) = 2;
 
+	int H_SEGS = 2;
+	int V_SEGS = 2 * H_SEGS;
+	int NUM_VERTS = 1 + (H_SEGS - 1) * V_SEGS + 1;
+	int SIZE = (2 * H_SEGS * V_SEGS) - V_SEGS;
+	Matrix I_2(SIZE, 2);
+
+	index = 1;
+	for (int i = 0; i < H_SEGS-1; ++i) {
+		
+		int n = (i * V_SEGS) + 1;
+		for (int j = 0; j < V_SEGS-1; ++j) {
+
+			I_2(index, 1) = (float)(n + j);
+			I_2(index, 2) = (float)(n + j + 1);
+			++index;
+			std::cout << n + j << " " << n + j + 1 << std::endl;
+		}
+		I_2(index, 1) = I_2((index - 1), 2);
+		I_2(index, 2) = (float)n;
+		++index;
+		std::cout << I_2(index - 2, 2) << " " << n << "\n\n\n";
+	}
+
+	for (int i = 1; i <= V_SEGS; ++i) {
+
+		int n = 1;
+		int m = (n + i);
+		// Bottom
+		I_2(index, 1) = (float)n;
+		I_2(index, 2) = (float)(n + i);
+		std::cout << I_2(index, 1) << " " << I_2(index, 2) << std::endl;
+		++index;
+
+		// Middle
+		for (int j = 0; j < H_SEGS-2; ++j) {
+
+			I_2(index, 1) = (float)m;
+			I_2(index, 2) = (float)m + V_SEGS;
+			std::cout << I_2(index, 1) << " " << I_2(index, 2) << std::endl;
+
+			++index;
+			m = m + V_SEGS;
+		}
+
+		// Top
+		I_2(index, 1) = (float)m;
+		I_2(index, 2) = (float)NUM_VERTS;
+		std::cout << I_2(index, 1) << " " << I_2(index, 2) << std::endl;
+		++index;
+
+		std::cout << "\n\n\n";
+	}
+	std::cout << index << std::endl;
+	std::cout << 2*H_SEGS*V_SEGS - V_SEGS << std::endl;
+
+
 	// Starting velocity [Vx Vy]/ per particle
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
 
@@ -378,7 +434,7 @@ int main()
 		// Draw object
 		glBindVertexArray(VAO);
 		// (mode, vertex count, type, element array buffer offset)
-		glDrawElements(GL_TRIANGLES, numTris * 3, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, numTriangles * 3, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
 		
 		// Swap buffers and check for keyboard input or mouse movement events
