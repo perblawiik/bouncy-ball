@@ -100,9 +100,6 @@ int main()
 
 	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
-	// Particle positions per cycle (passed into the shader)
-	GLfloat positions[342] = { 0.0f };
-
 	// Columns per row in the vertex array (coordinates + normals)
 	int stride = 6;
 	
@@ -110,19 +107,20 @@ int main()
 	int numHorizontalSegments = 8;
 	int numVerticalSegments = 2 * numHorizontalSegments;
 	int numVertices = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
-	std::cout << "numVerts: " << numVertices << std::endl;
+	std::cout << "Number of vertices: " << numVertices << std::endl;
 	int numTriangles = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
-	std::cout << "numTris: " << numTriangles << std::endl;
+	std::cout << "Number of triangles: " << numTriangles << std::endl;
 	std::cout << "Vertex array size: " << 3 * numVertices << std::endl;
 	
 	GLfloat *vertices = new GLfloat[numVertices * stride]; // Initialize vertex array
 	GLuint *indices = new GLuint[numTriangles * 3]; // Initialize index array
-	GLfloat radius = 20.0f;
+	GLfloat sphereRadius = 20.0f;
+	std::cout << "Radius: " << sphereRadius << std::endl;
 
 	/** Generate vertex array **/
 	// Bottom vertex
-	vertices[0] = 0.0f; vertices[1] = -radius; vertices[2] = 0.0f; // Coordinates
-	vertices[3] = 0.0f; vertices[4] = -radius; vertices[5] = 0.0f; // Normal
+	vertices[0] = 0.0f; vertices[1] = -sphereRadius; vertices[2] = 0.0f; // Coordinates
+	vertices[3] = 0.0f; vertices[4] = -sphereRadius; vertices[5] = 0.0f; // Normal
 
 	GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
 	GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
@@ -132,8 +130,8 @@ int main()
 	int index = 5; // Skip first 6 (the bottom vertex with normal already specified)
 	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
 
-		float Y = radius*cos(theta); // Y-coordinate
-		float R = radius*sin(theta); // radius
+		float Y = sphereRadius*cos(theta); // Y-coordinate
+		float R = sphereRadius*sin(theta); // radius
 
 		for (int j = 0; j < numVerticalSegments; ++j) {
 			// Vertex (x, y, z)
@@ -151,8 +149,8 @@ int main()
 	}
 
 	// Top vertex
-	vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f;
-	vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f;
+	vertices[++index] = 0.0f; vertices[++index] = sphereRadius; vertices[++index] = 0.0f;
+	vertices[++index] = 0.0f; vertices[++index] = sphereRadius; vertices[++index] = 0.0f;
 	
 	/** Generate index array */
 	// Bottom cap
@@ -169,7 +167,6 @@ int main()
 		}
 		indices[++index] = i + 1;
 	}
-	
 	
 	// Middle part
 	int v0 = 1;
@@ -192,7 +189,6 @@ int main()
 		indices[++index] = numVerticalSegments + v0;
 		++v0;
 	}
-	
 	
 	// Top cap
 	int lastVertexIndex = numVertices - 1;
@@ -252,13 +248,13 @@ int main()
 
 	Settings settings = {};
 	settings.h = 0.001f; // Step
-	settings.k = 5000.0f; // Spring constant
+	settings.k = 3500.0f; // Spring constant
 	settings.b = 10.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.NUM_BONDS = (2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments; // Total number of bonds
+	settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + (numVertices/2); // Total number of bonds
 	settings.NUM_POINTS = numVertices; // Total number of points (particles)
 	settings.DIM = 3; // 2-D
-	settings.SPHERE_RADIUS = radius;
+	settings.SPHERE_RADIUS = sphereRadius;
 
 	// Total weight of the system
 	const float WEIGHT = 5.0f;
@@ -277,11 +273,11 @@ int main()
 		X[i * settings.DIM + 2] = vertices[i * stride + 2];
 	}
 
-	std::cout << "Number of springs: " << settings.NUM_BONDS << std::endl;
+	// Indice table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
 	Matrix I(settings.NUM_BONDS, 2);
-
+	std::cout << "Number of springs: " << settings.NUM_BONDS << std::endl;
 	index = 1;
-	// Generate horizontal spring bond relations between the particles 
+	// Generate horizontal spring bond between the particles 
 	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
 
 		int n = (i * numVerticalSegments) + 2;
@@ -295,7 +291,7 @@ int main()
 		++index;
 	}
 
-	// Generate vertical spring bond relations between the particles 
+	// Generate vertical spring bond between the particles 
 	for (int i = 1; i <= numVerticalSegments; ++i) {
 
 		int n = 1;
@@ -307,10 +303,10 @@ int main()
 		++index;
 
 		// Middle part
-		for (int j = 0; j < numHorizontalSegments -2; ++j) {
+		for (int j = 0; j < numHorizontalSegments - 2; ++j) {
 
 			I(index, 1) = (float)m;
-			I(index, 2) = (float)m + numVerticalSegments;
+			I(index, 2) = (float)(m + numVerticalSegments);
 			++index;
 			m = m + numVerticalSegments;
 		}
@@ -320,6 +316,28 @@ int main()
 		I(index, 2) = (float)numVertices;
 		++index;
 	}
+
+	// Generate diagonal spring bonds through the diameter of the sphere
+	for (int i = 1; i <= numHorizontalSegments; ++i) {
+
+		int lower = 1;
+		int upper = (numVertices - 1 - numHorizontalSegments);
+		int m = (lower + i);
+		int n = (upper + i);
+
+		for (int j = 0; j < numHorizontalSegments - 1; ++j) {
+
+			I(index, 1) = (float)m;
+			I(index, 2) = (float)(n);
+			++index;
+			m = m + numVerticalSegments;
+			n = n - numVerticalSegments;
+		}
+	}
+
+	// Top and bottom bond
+	I(index, 1) = 1.0f;
+	I(index, 2) = (float)(numVerticalSegments);
 
 	// Starting velocity [Vx Vy]/ per particle
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
@@ -346,9 +364,9 @@ int main()
 	/***************************************/
 
 	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	// Hide the back face of the triangles
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();
@@ -369,9 +387,6 @@ int main()
 		// Calculate one cycle for the system
 		calculateSimulation(settings, m, X, I, V, Vp, Fk, Fkp, zeros, vec1, vec2, diff);
 
-		// Update particle positions
-		X.copyValues(positions);
-
 		//-------------------------------------//
 		/***************************************/
 
@@ -387,7 +402,7 @@ int main()
 		 // Projection Matrix
 		myShader.setFloatMat4("P", P);
 		// Insert particle positions in shader
-		myShader.setFloat("positions", positions, numVertices * 3);
+		myShader.setFloat("positions", X.getValues(), X.size());
 
 		// Draw object
 		glBindVertexArray(VAO);

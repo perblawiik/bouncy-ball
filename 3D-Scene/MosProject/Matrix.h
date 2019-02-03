@@ -192,6 +192,11 @@ public:
 		return this->columns;
 	}
 
+	float *getValues() 
+	{
+		return values;
+	};
+
 	// Destructor
 	~Matrix() 
 	{
