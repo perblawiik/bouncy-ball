@@ -6,6 +6,7 @@
 #include "Matrix.h"
 #include "SoftBody.h"
 #include "Structs.h"
+#include "Mesh.h"
 
 #include <iostream>
 
@@ -24,6 +25,7 @@ void processInput(GLFWwindow *window);
 // Perspective matrix
 void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
 void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z);
+void mat4Identity(GLfloat M[]);
 
 int main() 
 {
@@ -63,25 +65,15 @@ int main()
 	}
 
 	// Modelview matrix
-	GLfloat MV[16] = {
-
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
+	GLfloat MV[16] = {0};
+	// Position the object in front of the camera
 	mat4Translate(MV, 0.0f, 0.0f, -100.0f);
-	// Perspective matrix
-	GLfloat P[16] = {
 
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
+	// Perspective matrix
+	GLfloat P[16] = {0};
 	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f);
 
-	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
+	Shader softBodyShader("Shaders//SoftBody//vertex.glsl", "Shaders//SoftBody//fragment.glsl");
 
 	// Settings for the simulation model of the softbody
 	Settings settings = {};
@@ -93,10 +85,16 @@ int main()
 	settings.RADIUS = 20.0f;
 	settings.WEIGHT = 5.0f; // Total weight of the system
 
-	SoftBody bouncyBall;
 	// Create a sphere mesh
 	int numHorizontalSegments = 8; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
-	bouncyBall.createSphere(numHorizontalSegments, settings.RADIUS);
+	Mesh sphere;
+	sphere.createSphere(numHorizontalSegments, settings.RADIUS);
+	
+	// Initiate a softbody instance
+	SoftBody bouncyBall;
+
+	// Set the mesh of our softbody to the sphere created earlier
+	bouncyBall.setMesh(&sphere);
 	
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings);
@@ -126,20 +124,20 @@ int main()
 		bouncyBall.updateSimulationModel(settings);
 
 		// Activate shader
-		myShader.use();
+		softBodyShader.use();
 
 		// Update time and pass in to the shader
 		time = (GLfloat)glfwGetTime();
-		myShader.setFloat("time", time);
+		softBodyShader.setFloat("time", time);
 
 		// Model View Matrix
-		myShader.setFloatMat4("MV", MV);
+		softBodyShader.setFloatMat4("MV", MV);
 		 // Projection Matrix
-		myShader.setFloatMat4("P", P);
+		softBodyShader.setFloatMat4("P", P);
 
 		// Insert particle positions in shader
 		positions = bouncyBall.getParticlePositionArray();
-		myShader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
+		softBodyShader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
 
 		// Draw object
 		bouncyBall.render();
@@ -188,4 +186,12 @@ void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloa
 	M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f; M[13] = y;
 	M[2] = 0.0f; M[6] = 0.0f; M[10] = 1.0f; M[14] = z;
 	M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f; M[15] = 1.0f;
+}
+
+void mat4Identity(GLfloat M[]) {
+
+	M[0] = 1.0f; M[4] = 0.0f; M[8] = 0.0f;  M[12] = 0.0f;
+	M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f;  M[13] = 0.0f;
+	M[2] = 0.0f; M[6] = 0.0f; M[10] = 1.0f;  M[14] = 0.0f;
+	M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f;  M[15] = 1.0f;
 }

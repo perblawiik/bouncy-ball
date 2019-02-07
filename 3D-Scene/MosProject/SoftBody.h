@@ -9,13 +9,14 @@
 
 #include "Matrix.h"
 #include "Structs.h"
+#include "Mesh.h"
 
 class SoftBody 
 {
 public:
 
 	SoftBody ()
-		: VBO(0), VAO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(0)
+		: mesh(nullptr)
 	{ 
 		m = Matrix();
 		X = Matrix();
@@ -28,178 +29,21 @@ public:
 
 	~SoftBody()
 	{
-		delete[] vertices;
-		vertices = nullptr;
-		delete[] indices;
-		indices = nullptr;
-
-		// OPTIONAL: de-allocate all resources once they've outlived their purpose:
-		glDeleteVertexArrays(1, &VAO);
-		glDeleteBuffers(1, &VBO);
-		glDeleteBuffers(1, &EBO);
+		mesh = nullptr;
 	}
 
-	// Generates a sphere mesh with a specified number of horizontal segments and radius as input parameters.
-	void createSphere(const int segments, const float &radius)
+	void setMesh(Mesh *newMesh)
 	{
-		int numHorizontalSegments = segments;
-
-		// Minium amount of horizontal segments is 2
-		if (numHorizontalSegments < 2) {
-			numHorizontalSegments = 2;
-		}
-
-		// Number of vertical segments of the sphere
-		int numVerticalSegments = 2 * numHorizontalSegments;
-		this->numVertices = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
-		this->numTriangles = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
-
-		// Information about the sphere mesh
-		std::cout << "Number of vertices: " << numVertices << std::endl;
-		std::cout << "Number of triangles: " << numTriangles << std::endl;
-		std::cout << "Vertex array size: " << 3 * numVertices << std::endl;
-		std::cout << "Radius: " << radius << std::endl;
-
-		// Columns per row in the vertex array (coordinates + normals)
-		this->stride = 6;
-		this->vertices = new GLfloat[numVertices * stride]; // Initialize vertex array
-		this->indices = new GLuint[numTriangles * 3]; // Initialize index array
-	
-		/** Generate vertex array **/
-		// Bottom vertex
-		vertices[0] = 0.0f; vertices[1] = -radius; vertices[2] = 0.0f; // Coordinates
-		vertices[3] = 0.0f; vertices[4] = -radius; vertices[5] = 0.0f; // Normal
-
-		const GLfloat PI = 3.14159265359f;
-		GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
-		GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
-		GLfloat phi = 0; // Begin at Z = 0 (Z € 0 < phi < 2PI )
-
-		// Generate middle part vertices with normals
-		int index = 5; // Skip first 6 (the bottom vertex with normal already specified)
-		for (int i = 0; i < numHorizontalSegments - 1; ++i) {
-
-			float Y = radius * cos(theta); // Y-coordinate
-			float R = radius * sin(theta); // radius
-
-			for (int j = 0; j < numVerticalSegments; ++j) {
-				// Vertex (x, y, z)
-				vertices[++index] = R * sin(phi);
-				vertices[++index] = Y;
-				vertices[++index] = R * cos(phi);
-				// Normal (x, y, z)
-				vertices[++index] = R * sin(phi);
-				vertices[++index] = Y;
-				vertices[++index] = R * cos(phi);
-
-				phi += sampleRate;
-			}
-			theta += sampleRate;
-		}
-
-		// Top vertex
-		vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f; // Coordinates
-		vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f; // Normal
-
-		/** Generate index array */
-		// Bottom cap
-		index = -1;
-		for (int i = 0; i < numVerticalSegments; ++i) {
-
-			indices[++index] = 0;
-
-			if ((i + 2) <= numVerticalSegments) {
-				indices[++index] = i + 2;
-			}
-			else {
-				indices[++index] = (i + 2) - numVerticalSegments;
-			}
-			indices[++index] = i + 1;
-		}
-
-		// Middle part
-		int v0 = 1;
-		for (int i = 0; i < numHorizontalSegments - 2; i++) {
-			for (int j = 0; j < numVerticalSegments - 1; ++j) {
-				// One rectangle at a time (two triangles)
-				indices[++index] = v0;
-				indices[++index] = v0 + 1;
-				indices[++index] = numVerticalSegments + v0;
-				indices[++index] = v0 + 1;
-				indices[++index] = numVerticalSegments + v0 + 1;
-				indices[++index] = numVerticalSegments + v0;
-				++v0;
-			}
-			indices[++index] = v0;
-			indices[++index] = (v0 + 1) - numVerticalSegments;
-			indices[++index] = numVerticalSegments + v0;
-			indices[++index] = (v0 + 1) - numVerticalSegments;
-			indices[++index] = v0 + 1;
-			indices[++index] = numVerticalSegments + v0;
-			++v0;
-		}
-
-		// Top cap
-		int lastVertexIndex = numVertices - 1;
-		for (int i = 0; i < numVerticalSegments; ++i) {
-
-			indices[++index] = lastVertexIndex;
-
-			if ((lastVertexIndex - 2 - i) >= lastVertexIndex - numVerticalSegments) {
-				indices[++index] = lastVertexIndex - 2 - i;
-			}
-			else {
-				indices[++index] = lastVertexIndex - numVerticalSegments - 1;
-			}
-
-			indices[++index] = lastVertexIndex - 1 - i;
-		}
-
-		// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
-		//GLuint VBO, VAO, EBO;
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
-		glGenVertexArrays(1, &VAO);
-
-		// 1. Bind Vertex Array Object
-		glBindVertexArray(VAO);
-		// 2. Copy our vertices array in a buffer for OpenGL to use
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, stride * numVertices * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-		// 3. Copy our index array in a element buffer for OpenGL to use
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * numTriangles * sizeof(GLuint), indices, GL_STATIC_DRAW);
-
-		// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
-		// glVertexAttribPointer Parameters :
-		// 1. Specifies which vertex attribute we want to configure. 
-		//	  This sets the location of the vertex attribute to 0 and since we want to pass data to this vertex attribute, we pass in 0.
-		// 2. Specifies the size of the vertex attribute (vec3 is composed of 3 values).
-		// 3. Specifies the type of the data (float in this case)
-		// 4. Specifies if we want the data to be normalized.
-		// 5. Known as "the stride" and tells us the space between consecutive vertex attributes. 
-		//    Since the next set of position data is located exactly 3 times the size of a float away we specify that value as the stride.
-		// 6. This is the offset of where the position data begins in the buffer. 
-		//    Since the position data is at the start of the data array this value is just 0.
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)0); // Vertex coordinates
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); // normals
-		glEnableVertexAttribArray(0); // Vertex coordinates
-		glEnableVertexAttribArray(1); // Normals
-
-		// Deactivate (unbind) the VAO and the buffers again.
-		// Do NOT unbind the index buffer while the VAO is still bound.
-		// The index buffer is an essential part of the VAO state.
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		mesh = newMesh;
 	}
-
-	
 
 	void setupSimulationModel(Settings &s)
 	{
+		// Number of particles
+		s.NUM_POINTS = mesh->getNumVertices();
 
-		s.NUM_POINTS = numVertices;
+		// Mesh vertex array
+		GLfloat* vertices = mesh->getVertexArray();
 
 		//Masses per particle
 		Matrix masses(s.NUM_POINTS, 1); // Create Nx1 matrix
@@ -212,9 +56,9 @@ public:
 		//Particle x, y Pos [Xx Xy] / per particle
 		Matrix positions(s.NUM_POINTS, s.DIM);
 		for (int i = 0; i < s.NUM_POINTS; ++i) {
-			positions[i * s.DIM] = vertices[i * stride];
-			positions[i * s.DIM + 1] = vertices[i * stride + 1];
-			positions[i * s.DIM + 2] = vertices[i * stride + 2];
+			positions[i * s.DIM] = vertices[i *  mesh->getStride()];
+			positions[i * s.DIM + 1] = vertices[i *  mesh->getStride() + 1];
+			positions[i * s.DIM + 2] = vertices[i *  mesh->getStride() + 2];
 		}
 		// Store the positions as a member of the class
 		this->X = positions;
@@ -265,12 +109,14 @@ public:
 		// Store the derivatives of the spring forces as a member of the class
 		this->Fkp = springForceDerivatives;
 
+		// Deactivate pointer
+		vertices = nullptr;
 	}
 
 	void updateSimulationModel(const Settings &s)
 	{
 		// Used to set Vp to zero each cycle
-		Matrix zeros(numVertices, s.DIM);
+		Matrix zeros(s.NUM_POINTS, s.DIM);
 
 		// Dummy vectors (1xDIM matrix)
 		Matrix vec1(1, s.DIM);
@@ -339,12 +185,7 @@ public:
 
 	void render()
 	{
-		// Bind the VAO
-		glBindVertexArray(this->VAO);
-		// Draw the mesh (mode, vertex count, type, element array buffer offset)
-		glDrawElements(GL_TRIANGLES, this->numTriangles * 3, GL_UNSIGNED_INT, 0);
-		// Unbind the VAO
-		glBindVertexArray(0);
+		mesh->render();
 	}
 
 	// Returns an array containing the position coordinates of the particles
@@ -354,16 +195,8 @@ public:
 	}
 
 private:
-	GLuint VBO; // Vertex Buffer Object ID
-	GLuint VAO; // Vertex Array Object ID
-	GLuint EBO; // Element Buffer Object ID
-
-	GLfloat* vertices; // Vertex array
-	GLuint* indices; // Index array
-
-	int stride; // Number of elements per row in the vertex array
-	int numTriangles; // Number of triangels of the mesh
-	int numVertices; // Number of vertices of the mesh
+	// Mesh for the softbody
+	Mesh* mesh;
 
 	// Simulation variables
 	Matrix m; // The masses for each particle in the simulation
