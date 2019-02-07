@@ -248,12 +248,10 @@ int main()
 
 	Settings settings = {};
 	settings.h = 0.01f; // Step
-	settings.k = 8.0f; // Spring constant
-	settings.b = 0.2f; // Resistance constant
+	settings.k = 0.5f; // Spring constant
+	settings.b = 0.005f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	//settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + (numVertices/2); // Total number of bonds
-	settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + numVertices;
-	settings.NUM_POINTS = numVertices + 1; // Total number of points (particles)
+	settings.NUM_POINTS = numVertices; // Total number of points (particles)
 	settings.DIM = 3; // 2-D
 	settings.SPHERE_RADIUS = sphereRadius;
 
@@ -273,87 +271,33 @@ int main()
 		X[i * settings.DIM + 1] = vertices[i * stride + 1];
 		X[i * settings.DIM + 2] = vertices[i * stride + 2];
 	}
-	X(X.numRows(), 1) = 0.0f;
-	X(X.numRows(), 2) = 0.0f;
-	X(X.numRows(), 3) = 0.0f;
 
 	// Indice table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
+	settings.NUM_BONDS = 0;
+	int NUM_P = 10;
+	for (int i = 1; i <= settings.NUM_POINTS; ++i) {
+		settings.NUM_BONDS += settings.NUM_POINTS - i;
+	}
+
 	Matrix I(settings.NUM_BONDS, 2);
+	int ROW = 1;
+	for (int i = 1; i <= settings.NUM_POINTS; ++i) {
+
+		for (int j = i + 1; j <= settings.NUM_POINTS; ++j) {
+
+			I(ROW, 1) = (float)i;
+			I(ROW, 2) = (float)j;
+			++ROW;
+		}
+	}
 	std::cout << "Number of springs: " << settings.NUM_BONDS << std::endl;
-	index = 1;
-	// Generate horizontal spring bond between the particles 
-	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
-
-		int n = (i * numVerticalSegments) + 2;
-		for (int j = 0; j < numVerticalSegments - 1; ++j) {
-			I(index, 1) = (float)(n + j);
-			I(index, 2) = (float)(n + j + 1);
-			++index;
-		}
-		I(index, 1) = I((index - 1), 2);
-		I(index, 2) = (float)n;
-		++index;
-	}
-
-	// Generate vertical spring bond between the particles 
-	for (int i = 1; i <= numVerticalSegments; ++i) {
-
-		int n = 1;
-		int m = (n + i);
-
-		// Bottom part
-		I(index, 1) = (float)n;
-		I(index, 2) = (float)m;
-		++index;
-
-		// Middle part
-		for (int j = 0; j < numHorizontalSegments - 2; ++j) {
-
-			I(index, 1) = (float)m;
-			I(index, 2) = (float)(m + numVerticalSegments);
-			++index;
-			m = m + numVerticalSegments;
-		}
-
-		// Top part
-		I(index, 1) = (float)m;
-		I(index, 2) = (float)numVertices;
-		++index;
-	}
-
-	for (int row = 1; row <= settings.NUM_POINTS-1; ++row) {
-		I(index, 1) = (float)row;
-		I(index, 2) = (float)settings.NUM_POINTS;
-		std::cout << I(index, 1) << " " << I(index, 2) << std::endl;
-		++index;
-	}
-
-	/*
-	// Generate diagonal spring bonds through the diameter of the sphere
-	for (int i = 1; i <= numHorizontalSegments; ++i) {
-
-		int lower = 1;
-		int upper = (numVertices - 1 - numHorizontalSegments);
-		int m = (lower + i);
-		int n = (upper + i);
-
-		for (int j = 0; j < numHorizontalSegments - 1; ++j) {
-
-			I(index, 1) = (float)m;
-			I(index, 2) = (float)(n);
-			++index;
-			m = m + numVerticalSegments;
-			n = n - numVerticalSegments;
-		}
-	}
-
-	// Top and bottom bond
-	I(index, 1) = 1.0f;
-	I(index, 2) = (float)(numVerticalSegments);
-	*/
 
 	// Starting velocity [Vx Vy]/ per particle
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
+	for (int i = 1; i < settings.NUM_POINTS; ++i) {
+		//V(i, 1) = 5.0f;
+		//V(i, 2) = -50.0f;
+	}
 
 	// Acceleration dV/dt 
 	Matrix Vp(settings.NUM_POINTS, settings.DIM); // All set to zero by default
@@ -377,9 +321,9 @@ int main()
 	/***************************************/
 
 	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	// Hide the back face of the triangles
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();
