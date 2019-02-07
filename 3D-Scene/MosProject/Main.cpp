@@ -247,12 +247,13 @@ int main()
 	/**********S I M U L A T I O N**********/
 
 	Settings settings = {};
-	settings.h = 0.001f; // Step
-	settings.k = 3500.0f; // Spring constant
-	settings.b = 10.0f; // Resistance constant
+	settings.h = 0.01f; // Step
+	settings.k = 8.0f; // Spring constant
+	settings.b = 0.2f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + (numVertices/2); // Total number of bonds
-	settings.NUM_POINTS = numVertices; // Total number of points (particles)
+	//settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + (numVertices/2); // Total number of bonds
+	settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + numVertices;
+	settings.NUM_POINTS = numVertices + 1; // Total number of points (particles)
 	settings.DIM = 3; // 2-D
 	settings.SPHERE_RADIUS = sphereRadius;
 
@@ -272,6 +273,9 @@ int main()
 		X[i * settings.DIM + 1] = vertices[i * stride + 1];
 		X[i * settings.DIM + 2] = vertices[i * stride + 2];
 	}
+	X(X.numRows(), 1) = 0.0f;
+	X(X.numRows(), 2) = 0.0f;
+	X(X.numRows(), 3) = 0.0f;
 
 	// Indice table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
 	Matrix I(settings.NUM_BONDS, 2);
@@ -317,6 +321,14 @@ int main()
 		++index;
 	}
 
+	for (int row = 1; row <= settings.NUM_POINTS-1; ++row) {
+		I(index, 1) = (float)row;
+		I(index, 2) = (float)settings.NUM_POINTS;
+		std::cout << I(index, 1) << " " << I(index, 2) << std::endl;
+		++index;
+	}
+
+	/*
 	// Generate diagonal spring bonds through the diameter of the sphere
 	for (int i = 1; i <= numHorizontalSegments; ++i) {
 
@@ -338,6 +350,7 @@ int main()
 	// Top and bottom bond
 	I(index, 1) = 1.0f;
 	I(index, 2) = (float)(numVerticalSegments);
+	*/
 
 	// Starting velocity [Vx Vy]/ per particle
 	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
@@ -364,9 +377,9 @@ int main()
 	/***************************************/
 
 	// Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	// Hide the back face of the triangles
-	//glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();

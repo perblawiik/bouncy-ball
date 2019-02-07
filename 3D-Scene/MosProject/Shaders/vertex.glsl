@@ -10,7 +10,7 @@ uniform mat4 MV; // Model View Matrix
 out vec3 shadedColor;
 
 vec3 viewDirection = vec3(0.0, 0.0, 1.0); // the view direction - (0 ,0 ,1) in view space
-float n = 50.0; // the " shininess " parameter
+float n = 25.0; // the " shininess " parameter
 vec3 ka = vec3(0.0, 0.0, 0.0); // the ambient reflection color
 vec3 Ia = vec3(0.6, 0.6, 0.6); // the ambient illumination color
 vec3 kd = vec3(1.0, 0.5, 0.0); // the diffuse surface reflection color
