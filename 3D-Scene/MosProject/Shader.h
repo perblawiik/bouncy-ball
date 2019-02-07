@@ -1,3 +1,7 @@
+/***********************************************************************************/
+/*** Note that the template of this class is taken from https://learnopengl.com/ ***/
+/***********************************************************************************/
+
 #pragma once
 #ifndef SHADER_H
 #define SHADER_H

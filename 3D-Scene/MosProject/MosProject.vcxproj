@@ -148,6 +148,8 @@
   <ItemGroup>
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Shader.h" />
+    <ClInclude Include="SoftBody.h" />
+    <ClInclude Include="Structs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
