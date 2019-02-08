@@ -79,7 +79,7 @@ int main()
 	Settings settings = {};
 	settings.h = 0.01f; // Step
 	settings.k = 0.5f; // Spring constant
-	settings.b = 0.005f; // Resistance constant
+	settings.b = 0.01f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
 	settings.DIM = 3; // 2-D
 	settings.RADIUS = 20.0f;
@@ -100,15 +100,24 @@ int main()
 	bouncyBall.setupSimulationModel(settings);
 
 	// Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	// Hide the back face of the triangles
-	//glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();
+	GLfloat deltaTime = 0.0f;
 
 	// Pointer for passing particle position array into the shader
 	GLfloat* positions = bouncyBall.getParticlePositionArray();
+
+	// Number of simulation steps
+	int NUM_STEPS = 1500;
+	int stepCounter = 1;
+
+	Matrix POSITIONS(NUM_STEPS, settings.NUM_POINTS*settings.DIM);
+
+	bool simulationIsLoaded = false;
 
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
@@ -120,27 +129,75 @@ int main()
 		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		// Calculate one cycle of the simulation
-		bouncyBall.updateSimulationModel(settings);
 
-		// Activate shader
-		softBodyShader.use();
+		if (simulationIsLoaded == false) {
 
-		// Update time and pass in to the shader
-		time = (GLfloat)glfwGetTime();
-		softBodyShader.setFloat("time", time);
+			
+			static char titleString[200];
 
-		// Model View Matrix
-		softBodyShader.setFloatMat4("MV", MV);
-		 // Projection Matrix
-		softBodyShader.setFloatMat4("P", P);
+			for (int i = 1; i <= NUM_STEPS; ++i) {
+				// Calculate one cycle of the simulation
+				bouncyBall.updateSimulationModel(settings);
+				positions = bouncyBall.getParticlePositionArray();
 
-		// Insert particle positions in shader
-		positions = bouncyBall.getParticlePositionArray();
-		softBodyShader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
+				for (int j = 0; j < settings.NUM_POINTS*settings.DIM; ++j) {
+					POSITIONS(i, j + 1) = positions[j];
+				}
+				float progress = 100.0f * (float)i / (float)NUM_STEPS;
+				sprintf_s(titleString, "Bouncy Ball, Loading Simulation: %.1f percent", progress);
+				glfwSetWindowTitle(window, titleString);
+			}
 
-		// Draw object
-		bouncyBall.render();
+			positions = new GLfloat[settings.NUM_POINTS * settings.DIM];
+			simulationIsLoaded = true;
+		}
+
+
+		GLfloat currentTime = (GLfloat)glfwGetTime();
+		deltaTime = currentTime - time;
+		time = currentTime;
+
+		GLfloat last = time;
+		GLfloat update = deltaTime;
+		
+		// Hold the frame for "settings.h" seconds
+		while (update < settings.h) {
+			currentTime = (GLfloat)glfwGetTime();
+			update += currentTime - last;
+			last = currentTime;
+		}
+
+		// Render all steps on repeat
+		if (stepCounter < NUM_STEPS) {
+
+			// Activate shader
+			softBodyShader.use();
+
+			// Update time and pass in to the shader
+			softBodyShader.setFloat("time", time);
+
+			// Model View Matrix
+			softBodyShader.setFloatMat4("MV", MV);
+			// Projection Matrix
+			softBodyShader.setFloatMat4("P", P);
+
+			for (int i = 0; i < settings.NUM_POINTS*settings.DIM; ++i) {
+
+				//POSITIONS.copyRow(i + 1, positions);
+				positions[i] = POSITIONS(stepCounter, i + 1);
+			}
+
+			// Insert particle positions in shader
+			softBodyShader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
+
+			// Draw object
+			bouncyBall.render();
+
+			++stepCounter;
+			if (stepCounter >= NUM_STEPS) {
+				stepCounter = 1;
+			}
+		}
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);

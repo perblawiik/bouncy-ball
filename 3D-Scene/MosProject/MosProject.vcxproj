@@ -142,15 +142,15 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\fragment.glsl" />
-    <None Include="Shaders\vertex.glsl" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="SoftBody.h" />
     <ClInclude Include="Structs.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\SoftBody\fragment.glsl" />
+    <None Include="Shaders\SoftBody\vertex.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
