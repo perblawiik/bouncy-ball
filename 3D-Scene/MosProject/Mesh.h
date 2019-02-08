@@ -18,7 +18,7 @@ public:
 
 	// Copy constructor
 	Mesh(const Mesh &m)
-		: VAO(m.VAO), vertices(new GLfloat[m.numTriangles*3]), indices(new GLuint(m.numTriangles*3)), numVertices(m.numVertices), numTriangles(m.numTriangles), stride(m.stride)
+		: VAO(m.VAO), vertices(new GLfloat[m.numVertices * m.stride]), indices(new GLuint[m.numTriangles * 3]), numVertices(m.numVertices), numTriangles(m.numTriangles), stride(m.stride)
 	{
 		meshIsEmpty = false;
 

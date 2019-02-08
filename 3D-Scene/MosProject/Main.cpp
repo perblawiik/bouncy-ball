@@ -22,7 +22,13 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 // Checks if a key is currently being pressed
 void processInput(GLFWwindow *window);
 
-// Perspective matrix
+// Load simulation with specified number of steps and store all particle positions in a single matrix.
+// Returns true when the simulation is loaded.
+bool loadSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITIONS, GLfloat* positions, Settings &settings, const int NUM_STEPS);
+// Render one cycle of the simulation, if step counter is larger than total steps, the step counter is reset to 1
+void renderSimulationCycle(int &stepCounter, const int NUM_STEPS, Shader &shader, GLfloat MV[], GLfloat P[], Settings &settings, Matrix &PARTICLE_POSITIONS, GLfloat *positions, SoftBody &softBody);
+
+// Matrix functions
 void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
 void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z);
 void mat4Identity(GLfloat M[]);
@@ -77,32 +83,26 @@ int main()
 
 	// Settings for the simulation model of the softbody
 	Settings settings = {};
-	settings.h = 0.01f; // Step
+	settings.h = 0.01f; // Step size
 	settings.k = 0.5f; // Spring constant
 	settings.b = 0.01f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.DIM = 3; // 2-D
+	settings.DIM = 3; // 3-D (x,y,z)
 	settings.RADIUS = 20.0f;
 	settings.WEIGHT = 5.0f; // Total weight of the system
+	settings.NUM_STEPS = 500; // Specifies how many steps the simulation will be calculated
 
-	// Create a sphere mesh
+	// Create a sphere mesh (for the softbody)
 	int numHorizontalSegments = 8; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	Mesh sphere;
 	sphere.createSphere(numHorizontalSegments, settings.RADIUS);
 	
-	// Initiate a softbody instance
+	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
-
 	// Set the mesh of our softbody to the sphere created earlier
 	bouncyBall.setMesh(&sphere);
-	
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings);
-
-	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	// Hide the back face of the triangles
-	glEnable(GL_CULL_FACE);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();
@@ -111,92 +111,58 @@ int main()
 	// Pointer for passing particle position array into the shader
 	GLfloat* positions = bouncyBall.getParticlePositionArray();
 
-	// Number of simulation steps
-	int NUM_STEPS = 1500;
+	// A matrix to store all simulation cycles in
+	Matrix PARTICLE_POSITIONS(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
+
+	// A flag to see if the simulation is loaded
+	bool simulationIsLoaded = false;
+	// Counter to keep track of which simulation step to render
 	int stepCounter = 1;
 
-	Matrix POSITIONS(NUM_STEPS, settings.NUM_POINTS*settings.DIM);
-
-	bool simulationIsLoaded = false;
+	// Wireframe mode
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	// Hide the back face of the triangles
+	glEnable(GL_CULL_FACE);
+	glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
 	{
+		// Check if the simulation is loaded (always false on first run)
+		if (simulationIsLoaded == false) {
+			// Compute the entire simulation with specified number of steps
+			simulationIsLoaded = loadSimulation(window, bouncyBall, PARTICLE_POSITIONS, positions, settings, settings.NUM_STEPS);
+			positions = new GLfloat[settings.NUM_POINTS * settings.DIM];
+		}
+
 		// Read input
 		processInput(window);
 
 		// Rendering commands here
-		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
+		// Render (draw) the simulation one step at the time
+		renderSimulationCycle(
+			stepCounter, // Keeps count of which simulation step to draw
+			settings.NUM_STEPS, // Number of steps of the entire simulation
+			softBodyShader, // Shader for the bouncy ball
+			MV, P, // Modelview and Perspective matrices to pass into the shader
+			settings, // Struct that contains specifications about the simulation
+			PARTICLE_POSITIONS, // A matrix that stores all simulation steps
+			positions, // Used to pass one cycle (step) of position coordinates into the vertex shader
+			bouncyBall // SoftBody simulation model (contains all information about the simulation)
+		);
 
-		if (simulationIsLoaded == false) {
-
-			
-			static char titleString[200];
-
-			for (int i = 1; i <= NUM_STEPS; ++i) {
-				// Calculate one cycle of the simulation
-				bouncyBall.updateSimulationModel(settings);
-				positions = bouncyBall.getParticlePositionArray();
-
-				for (int j = 0; j < settings.NUM_POINTS*settings.DIM; ++j) {
-					POSITIONS(i, j + 1) = positions[j];
-				}
-				float progress = 100.0f * (float)i / (float)NUM_STEPS;
-				sprintf_s(titleString, "Bouncy Ball, Loading Simulation: %.1f percent", progress);
-				glfwSetWindowTitle(window, titleString);
-			}
-
-			positions = new GLfloat[settings.NUM_POINTS * settings.DIM];
-			simulationIsLoaded = true;
-		}
-
-
+		// Update current time
 		GLfloat currentTime = (GLfloat)glfwGetTime();
+		// Calculate time passed since last render
 		deltaTime = currentTime - time;
+		// Update time
 		time = currentTime;
 
-		GLfloat last = time;
-		GLfloat update = deltaTime;
-		
-		// Hold the frame for "settings.h" seconds
-		while (update < settings.h) {
+		// Hold each frame for a specified number of seconds (its based on step size of the simulation right now)
+		while ((currentTime - time) < (settings.h - deltaTime)) {
 			currentTime = (GLfloat)glfwGetTime();
-			update += currentTime - last;
-			last = currentTime;
-		}
-
-		// Render all steps on repeat
-		if (stepCounter < NUM_STEPS) {
-
-			// Activate shader
-			softBodyShader.use();
-
-			// Update time and pass in to the shader
-			softBodyShader.setFloat("time", time);
-
-			// Model View Matrix
-			softBodyShader.setFloatMat4("MV", MV);
-			// Projection Matrix
-			softBodyShader.setFloatMat4("P", P);
-
-			for (int i = 0; i < settings.NUM_POINTS*settings.DIM; ++i) {
-
-				//POSITIONS.copyRow(i + 1, positions);
-				positions[i] = POSITIONS(stepCounter, i + 1);
-			}
-
-			// Insert particle positions in shader
-			softBodyShader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
-
-			// Draw object
-			bouncyBall.render();
-
-			++stepCounter;
-			if (stepCounter >= NUM_STEPS) {
-				stepCounter = 1;
-			}
 		}
 		
 		// Swap buffers and check for keyboard input or mouse movement events
@@ -208,6 +174,68 @@ int main()
 	glfwTerminate();
 
 	return 0;
+}
+
+
+bool loadSimulation(GLFWwindow* window, SoftBody &softBody, Matrix &PARTICLE_POSITIONS, GLfloat* positions, Settings &settings, const int NUM_STEPS)
+{
+	// Title string to display loading progress
+	static char titleString[200];
+
+	for (int i = 1; i <= NUM_STEPS; ++i) {
+		// Clear screen
+		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// Calculate one cycle of the simulation
+		softBody.updateSimulationModel(settings);
+		positions = softBody.getParticlePositionArray();
+
+		// Store the calculated step as a row in a matrix
+		for (int j = 0; j < settings.NUM_POINTS*settings.DIM; ++j) {
+			PARTICLE_POSITIONS(i, j + 1) = positions[j];
+		}
+
+		// Compute the percentage of completion
+		float progress = 100.0f * (float)i / (float)NUM_STEPS;
+		// Compose a string with loading progress message
+		sprintf_s(titleString, "Bouncy Ball, Loading Simulation: %.1f %%", progress);
+		// Display loading progress in the window title
+		glfwSetWindowTitle(window, titleString);
+
+		// Swap buffers and check for keyboard input or mouse movement events
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+	return true;
+}
+
+void renderSimulationCycle(int &stepCounter, const int NUM_STEPS, Shader &shader, GLfloat MV[], GLfloat P[], Settings &settings, Matrix &PARTICLE_POSITIONS, GLfloat *positions, SoftBody &softBody )
+{
+	// Activate shader
+	shader.use();
+	// Model View Matrix
+	shader.setFloatMat4("MV", MV);
+	// Projection Matrix
+	shader.setFloatMat4("P", P);
+
+	// Copy positions from step number x to the positions array
+	for (int i = 0; i < settings.NUM_POINTS*settings.DIM; ++i) {
+		positions[i] = PARTICLE_POSITIONS(stepCounter, i + 1);
+	}
+
+	// Insert particle positions in the fragment shader 
+	shader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
+
+	// Draw object
+	softBody.render();
+
+	// Incremet the counter to the next simulation step, if the counter has reached maximum number of steps, reset counter
+	++stepCounter;
+	if (stepCounter >= NUM_STEPS) {
+		stepCounter = 1;
+	}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)

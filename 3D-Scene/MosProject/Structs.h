@@ -19,6 +19,7 @@ struct Settings
 	GLint NUM_BONDS;
 	GLint NUM_POINTS;
 	GLint DIM;
+	GLint NUM_STEPS;
 };
 
 #endif
