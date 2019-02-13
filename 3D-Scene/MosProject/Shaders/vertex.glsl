@@ -3,7 +3,6 @@ layout (location = 0) in vec3 Position;
 layout (location = 1) in vec3 Normal;
 
 uniform float time;
-uniform float positions[342];
 uniform mat4 P; // Projection Matrix
 uniform mat4 MV; // Model View Matrix
 
@@ -21,12 +20,6 @@ vec3 Is = vec3(1.0, 1.0, 1.0); // the specular illumination color
 
 void main()
 {
-	int vertexId = gl_VertexID;
-	float x = positions[vertexId * 3];
-	float y = positions[vertexId * 3 + 1];
-	float z = positions[vertexId * 3 + 2];
-	vec3 simulationPos = vec3(x, y, z);
-
 	// Final transformation ( Perspective multiplied with the model view )
     mat4 T = P * MV;
 
@@ -43,5 +36,5 @@ void main()
     shadedColor = Ia*ka + Id*kd* dotNL + Is*ks* pow (dotRV , n);
 
 	// Transform (x,y,z) vertex coordinates with a 4x4 matrix T
-    gl_Position = T * vec4(simulationPos, 1.0);
+    gl_Position = T * vec4(Position, 1.0);
 }

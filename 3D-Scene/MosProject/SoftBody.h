@@ -37,53 +37,24 @@ public:
 		mesh = newMesh;
 	}
 
-	void setupSimulationModel(Settings &s)
+	void setupSimulationModel(Settings &s, const float &bondRegionRadius)
 	{
 		// Number of particles
 		s.NUM_POINTS = mesh->getNumVertices();
 
-		// Mesh vertex array
-		GLfloat* vertices = mesh->getVertexArray();
+		// Create a matrix containing the position coordinates of the mesh vertices
+		this->createParticlePositionMatrix(s);
+
+		// Generate an index table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
+		this->createBondIndexMatrix(s, bondRegionRadius);
 
 		//Masses per particle
 		Matrix masses(s.NUM_POINTS, 1); // Create Nx1 matrix
 		for (int i = 0; i < masses.size(); ++i) {
-			masses[i] = s.WEIGHT / (float)s.NUM_POINTS; // All masses divided equally
+			masses[i] = s.WEIGHT / (float)s.NUM_POINTS; // The whole mass is distributed equally
 		}
 		// Store the masses as a member of the class
 		this->m = masses;
-
-		//Particle x, y Pos [Xx Xy] / per particle
-		Matrix positions(s.NUM_POINTS, s.DIM);
-		for (int i = 0; i < s.NUM_POINTS; ++i) {
-			positions[i * s.DIM] = vertices[i *  mesh->getStride()];
-			positions[i * s.DIM + 1] = vertices[i *  mesh->getStride() + 1];
-			positions[i * s.DIM + 2] = vertices[i *  mesh->getStride() + 2];
-		}
-		// Store the positions as a member of the class
-		this->X = positions;
-
-		// Indice table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
-		s.NUM_BONDS = 0;
-		int NUM_P = 10;
-		for (int i = 1; i <= s.NUM_POINTS; ++i) {
-			s.NUM_BONDS += s.NUM_POINTS - i;
-		}
-		std::cout << "Number of springs: " << s.NUM_BONDS << std::endl;
-
-		Matrix bondIndices(s.NUM_BONDS, 2);
-		int ROW = 1;
-		for (int i = 1; i <= s.NUM_POINTS; ++i) {
-
-			for (int j = i + 1; j <= s.NUM_POINTS; ++j) {
-
-				bondIndices(ROW, 1) = (float)i;
-				bondIndices(ROW, 2) = (float)j;
-				++ROW;
-			}
-		}
-		// Store the bond indices as a member of the class
-		this->I = bondIndices;
 
 		// Starting velocity [Vx Vy]/ per particle
 		Matrix velocities(s.NUM_POINTS, s.DIM); // All set to zero by default
@@ -108,9 +79,6 @@ public:
 		Matrix springForceDerivatives(s.NUM_BONDS, s.DIM); // All set to zero by default
 		// Store the derivatives of the spring forces as a member of the class
 		this->Fkp = springForceDerivatives;
-
-		// Deactivate pointer
-		vertices = nullptr;
 	}
 
 	void updateSimulationModel(const Settings &s)
@@ -139,7 +107,7 @@ public:
 			// Vector from point 1 to 2
 			diff = vec1 - vec2;
 
-			// Normalise it, used to give the Fk and Fb direction
+			// Normalise it, used to give Fk and Fb direction
 			diff.normalize();
 
 			// Get deltaV, speed difference between the particles in the spring's direction
@@ -167,20 +135,26 @@ public:
 			Vp(r, 2) = Vp(r, 2) - s.g;
 		}
 
-		// Approximating the new values using: X_n + 1 = X_n + h * X'_n
+		// Approximating the new values using: X_n + 1 = X_n + h * X'_n (Eulers)
 		// (they're not supressed for debugging purposes)
 		V = V + (Vp * s.h);
 		Fk = Fk + (Fkp * s.h);
 		X = X + (V * s.h);
 
-		// Code that flips Y - ward velocity when the particle has Xy < -4.0 
+		// Set velocity to zero if particle hits the ground
 		for (int j = 1; j <= s.NUM_POINTS; ++j) {
 
-			if (X(j, 2) < (-s.RADIUS * 2)) {
-				V(j, 2) = 0.0f;
-				X(j, 2) = -s.RADIUS * 2;
+			// Check if particle position is below the ground
+			if (X(j, 2) < (-s.RADIUS * 2.0f)) {
+				V(j, 2) = 0.0f; // Set velocity to zero
+				X(j, 2) = -s.RADIUS * 2.0f; // Move the position to ground level
 			}
 		}
+	}
+
+	void updatePositions()
+	{
+		mesh->updateVertexBufferData();
 	}
 
 	void render()
@@ -192,6 +166,11 @@ public:
 	GLfloat* getParticlePositionArray()
 	{
 		return this->X.getValues();
+	}
+
+	GLfloat* getMeshVertexArray()
+	{
+		return mesh->getVertexArray();
 	}
 
 private:
@@ -206,6 +185,77 @@ private:
 	Matrix Vp; // The accelerations of each particle in the simulation
 	Matrix Fk; // The spring force for the spring bonds in the simulation
 	Matrix Fkp; // The derivative of Fk
+
+	void createParticlePositionMatrix(Settings &s)
+	{
+		// Mesh vertex array
+		GLfloat* vertices = mesh->getVertexArray();
+		int stride = mesh->getStride();
+
+		// Particle position coordinates (x, y, z) per particle
+		Matrix positions(s.NUM_POINTS, s.DIM);
+		for (int i = 0; i < s.NUM_POINTS; ++i) {
+			positions[i * s.DIM] = vertices[i * stride];
+			positions[i * s.DIM + 1] = vertices[i *  stride + 1];
+			positions[i * s.DIM + 2] = vertices[i *  stride + 2];
+		}
+		// Store the positions as a member of the class
+		this->X = positions;
+
+		// Deactivate pointer
+		vertices = nullptr;
+	}
+
+	void createBondIndexMatrix(Settings &s, const float &bondRegionRadius)
+	{
+		// Compute the maximum number of bonds if all particles are attached to each other
+		int maxNumBonds = 0;
+		for (int i = 1; i <= s.NUM_POINTS; ++i) {
+			maxNumBonds += s.NUM_POINTS - i;
+		}
+		std::cout << "Maximum number of springs: " << maxNumBonds << std::endl;
+
+		Matrix bondIndices(maxNumBonds, 2);
+		// A counter for row index
+		int row = 1;
+		// Generate indice table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
+		for (int i = 1; i <= s.NUM_POINTS; ++i) {
+
+			for (int j = i + 1; j <= s.NUM_POINTS; ++j) {
+
+				float dist = 0.0f;
+				// Calculate the euclidian distance between the particles
+				dist = sqrt(pow(X(j, 1) - X(i, 1), 2) + pow(X(j, 2) - X(i, 2), 2) + pow(X(j, 3) - X(i, 3), 2));
+				// Only attach a spring bond if distance is smaller than the given region
+				if (dist < bondRegionRadius) {
+					bondIndices(row, 1) = (float)i;
+					bondIndices(row, 2) = (float)j;
+					++row;
+				}
+			}
+		}
+
+		// If number of rows is smaller than the maximum number of spring bonds, create a smaller matrix
+		if (row < maxNumBonds) {
+			std::cout << "Number of springs used: " << row - 1 << std::endl;
+
+			Matrix bondIndicesFinal(row - 1, 2);
+			for (int i = 1; i <= bondIndicesFinal.numRows(); ++i) {
+				bondIndicesFinal(i, 1) = bondIndices(i, 1);
+				bondIndicesFinal(i, 2) = bondIndices(i, 2);
+			}
+			// Set number of spring bonds
+			s.NUM_BONDS = row - 1;
+			// Store the bond indices as a member of the class
+			this->I = bondIndicesFinal;
+		}
+		else {
+			// Set number of spring bonds
+			s.NUM_BONDS = maxNumBonds;
+			// Store the bond indices as a member of the class
+			this->I = bondIndices;
+		}
+	}
 };
 
 #endif

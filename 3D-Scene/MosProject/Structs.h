@@ -7,6 +7,7 @@
 
 /** STRUCTS **/
 // Struct with all constant values for the simulation
+
 struct Settings
 {
 	GLfloat h; // Step
@@ -15,11 +16,25 @@ struct Settings
 	GLfloat g; // Gravitation constant
 	GLfloat RADIUS; // Radius of the sphere
 	GLfloat WEIGHT; // Total weight of the sphere
+	GLfloat TIME_DURATION; // Determines how long the simulation should be (given in seconds)
 
 	GLint NUM_BONDS;
 	GLint NUM_POINTS;
 	GLint DIM;
 	GLint NUM_STEPS;
 };
+
+struct GLOBAL_CONSTANTS {
+
+	enum window
+	{
+		WIDTH = 800,
+		HEIGHT = 600
+	};
+
+	static const float PI;
+};
+
+const float GLOBAL_CONSTANTS::PI = 3.14159265359f;
 
 #endif
