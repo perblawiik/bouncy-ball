@@ -110,7 +110,7 @@ int main()
 
 	// Create a XZ-plane as floor
 	Mesh floor;
-	floor.createPlaneXZ(settings.RADIUS*2.0f, settings.RADIUS*2.0f);
+	floor.createPlaneXZ(100.0f, 100.0f);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();
@@ -235,9 +235,9 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 
 	// Update the vertex array of the mesh from the simulated position data
 	for (int i = 0; i < settings.NUM_POINTS; ++i) {
-		vertexArray[i * 6] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 1);
-		vertexArray[(i * 6) + 1] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 2);
-		vertexArray[(i * 6) + 2] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 3);
+		vertexArray[i * 8] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 1);
+		vertexArray[(i * 8) + 1] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 2);
+		vertexArray[(i * 8) + 2] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 3);
 	}
 
 	// Update vertex buffer with new vertex array

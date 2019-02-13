@@ -11,7 +11,7 @@ class Mesh
 public:
 
 	Mesh()
-		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(6)
+		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8)
 	{ }
 
 	// Copy constructor
@@ -58,14 +58,13 @@ public:
 	void createPlaneXZ(const GLfloat &WIDTH, const GLfloat &HEIGHT)
 	{
 		meshIsEmpty = false;
-		stride = 8;
 
 		const GLfloat vertexData[] = {
 			// Position Coordinates                    // Normals          // Texture coordinates
-			-(WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // Upper left
-			 (WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // Upper right
+			-(WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 1.0f, // Upper left
+			 (WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, // Upper right
 			 (WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // Lower right
-			-(WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f // Lower left
+			-(WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 0.0f  // Lower left
 		};
 
 		const GLuint indexData[] = {
@@ -126,15 +125,16 @@ public:
 		/** Generate vertex array **/
 		// Bottom vertex
 		vertices[0] = 0.0f; vertices[1] = -radius; vertices[2] = 0.0f; // Coordinates
-		vertices[3] = 0.0f; vertices[4] = -radius; vertices[5] = 0.0f; // Normal
+		vertices[3] = 0.0f; vertices[4] = -1.0f; vertices[5] = 0.0f; // Normal
+		vertices[6] = 0.5f; vertices[7] = 0.0f;
 
-		const GLfloat PI = 3.14159265359f;
+		const GLfloat PI = GLOBAL_CONSTANTS::PI;
 		GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
 		GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
 		GLfloat phi = 0; // Begin at Z = 0 (Z € 0 < phi < 2PI )
 
 		// Generate middle part vertices with normals
-		int index = 5; // Skip first 6 (the bottom vertex with normal already specified)
+		int index = 7; // Skip first 7 (the bottom vertex with normal and texture coordinates already specified)
 		for (int i = 0; i < numHorizontalSegments - 1; ++i) {
 
 			float Y = radius * cos(theta); // Y-coordinate
@@ -149,6 +149,9 @@ public:
 				vertices[++index] = R * sin(phi);
 				vertices[++index] = Y;
 				vertices[++index] = R * cos(phi);
+				// Texture Coordinates (s, t)
+				vertices[++index] = (float)j/numVerticalSegments;
+				vertices[++index] = 1.0f - (float)(i + 1) / numHorizontalSegments;
 
 				phi += sampleRate;
 			}
@@ -158,6 +161,7 @@ public:
 		// Top vertex
 		vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f; // Coordinates
 		vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f; // Normal
+		vertices[++index] = 0.5f; vertices[++index] = 1.0f;
 
 		/** Generate index array */
 		// Bottom cap
@@ -319,9 +323,11 @@ private:
 		// 6. This is the offset of where the position data begins in the buffer. 
 		//    Since the position data is at the start of the data array this value is just 0.
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)0); // Vertex coordinates
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); // normals
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); // Normals
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)(6 * sizeof(GLfloat))); // Texture coordinates
 		glEnableVertexAttribArray(0); // Vertex coordinates
 		glEnableVertexAttribArray(1); // Normals
+		glEnableVertexAttribArray(2); // Texture coordinates
 	}
 
 	void clean()
@@ -352,7 +358,6 @@ private:
 		}
 		this->EBO = 0;
 
-		
 		this->numTriangles = 0;
 		this->numVertices = 0;
 	}
