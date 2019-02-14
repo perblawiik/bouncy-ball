@@ -1,12 +1,14 @@
 clear;
+close all
+
 
 % CONSTANTS
     % time between each approximation
 h = 0.01;
     % spring constant
-k = 50;
+k = 20;
     % resistativitation constant
-b = 5;
+b = 0.5;
     % gravitational constant
 g = 9.8;
     % Floor bounciness multiplier (0-1 preferably :3)
@@ -15,23 +17,16 @@ fBounce = 0;
 % PARTICLES AND SPRINGS
 % ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
     % masses [m]/ per particle
-m = [1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1;];
+m = [1; 1; 1];
     % particle x, y Pos [Xx Xy] / per particle
-X = [20 10; 24 11; 26 13; 27 17; 26 21; 24 23; 20 24; 16 23; 14 21; 13 17; 14 13; 16 11; 20 17];
+X = [15 20; 25 20; 20 30];
     % particle indices for spring bonds [i1 i2]/ per spring
-I = [1 2; 2 3; 3 4; 4 5; 5 6; 6 7; 7 8; 8 9; 9 10; 10 11; 11 12; 12 1;
-     1 13; 2 13; 3 13; 4 13; 5 13; 6 13; 7 13; 8 13; 9 13; 10 13; 11 13; 12 13;]; 
+I = [1 2; 2 3; 3 1]; 
  
 BONDS = size(I,1);
 POINTS = size(X,1);
 
-NORM = zeros(size(X));
-for p = 1:12
-    in1 = X(p,:)-X(mod(p-2,12)+1,:);
-    in2 = X(p,:)-X(mod(p,12)+1,:);
-    normDir = in1/norm(in1)+in2/norm(in2);
-    NORM(p,:) = normDir/norm(normDir);
-end
+
 
 % DEFINING S.S.VARIABLES, STARTING VALUES
     % starting velocity [Vx Vy]/ per particle
@@ -91,20 +86,11 @@ for i = 1:CYCLES
     hold on;
     plot([-50 50], [0 0]); 
     plot(animation(:,1,i),animation(:,2,i),'ro')
-    for p = 1:12
-        in1 = animation(p,:,i)-animation(mod(p-2,12)+1,:,i);
-        in2 = animation(p,:,i)-animation(mod(p,12)+1,:,i);
-        normDir = in1/norm(in1)+in2/norm(in2);
-        if(abs(norm(normDir))>.001)
-            NORM(p,:) = sign(dot(NORM(p,:),normDir))*normDir/norm(normDir);
-        end
-    end
+    
     for n = 1:BONDS 
         plot([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)],'b--');
     end
-    for n = 1:12 
-        plot([animation(n,1,i) animation(n,1,i)+10*NORM(n,1)],[animation(n,2,i) animation(n,2,i)+10*NORM(n,2)],'g');
-    end
+    
     xlim([-15 40]);
     ylim([-5 40]);
     

@@ -1,12 +1,14 @@
 clear;
+close all
+
 
 % CONSTANTS
     % time between each approximation
 h = 0.01;
     % spring constant
-k = 50;
+k = 60;
     % resistativitation constant
-b = 5;
+b = 2;
     % gravitational constant
 g = 9.8;
     % Floor bounciness multiplier (0-1 preferably :3)
@@ -91,20 +93,11 @@ for i = 1:CYCLES
     hold on;
     plot([-50 50], [0 0]); 
     plot(animation(:,1,i),animation(:,2,i),'ro')
-    for p = 1:12
-        in1 = animation(p,:,i)-animation(mod(p-2,12)+1,:,i);
-        in2 = animation(p,:,i)-animation(mod(p,12)+1,:,i);
-        normDir = in1/norm(in1)+in2/norm(in2);
-        if(abs(norm(normDir))>.001)
-            NORM(p,:) = sign(dot(NORM(p,:),normDir))*normDir/norm(normDir);
-        end
-    end
+    
     for n = 1:BONDS 
         plot([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)],'b--');
     end
-    for n = 1:12 
-        plot([animation(n,1,i) animation(n,1,i)+10*NORM(n,1)],[animation(n,2,i) animation(n,2,i)+10*NORM(n,2)],'g');
-    end
+    
     xlim([-15 40]);
     ylim([-5 40]);
     
