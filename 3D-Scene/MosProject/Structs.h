@@ -26,15 +26,25 @@ struct Settings
 
 struct GLOBAL_CONSTANTS {
 
+	struct window
+	{
+		static const int WIDTH;
+		static const int HEIGHT;
+	};
+
+	/*
 	enum window
 	{
 		WIDTH = 800,
 		HEIGHT = 600
 	};
+	*/
 
 	static const float PI;
 };
 
+const int GLOBAL_CONSTANTS::window::WIDTH = 800;
+const int GLOBAL_CONSTANTS::window::HEIGHT = 600;
 const float GLOBAL_CONSTANTS::PI = 3.14159265359f;
 
 #endif
