@@ -11,9 +11,9 @@
 #include <iostream>
 
 /** CONSTANTS **/
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-const GLfloat PI = 3.14159265359f;
+const unsigned int WINDOW_WIDTH = GLOBAL_CONSTANTS::window::WIDTH;
+const unsigned int WINDOW_HEIGHT = GLOBAL_CONSTANTS::window::HEIGHT;
+const GLfloat PI = GLOBAL_CONSTANTS::PI;
 
 /** FUNCTION DECLARATIONS **/
 // A callback function on the window that gets called each time the window is resized
@@ -22,7 +22,13 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 // Checks if a key is currently being pressed
 void processInput(GLFWwindow *window);
 
-// Perspective matrix
+// Load simulation with specified number of steps and store all particle positions in a single matrix.
+// Returns true when the simulation is loaded.
+bool loadSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITION_DATA, Settings &settings, const int NUM_STEPS);
+// Render one cycle of the simulation, if step counter is larger than total steps, the step counter is reset to 1
+void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody);
+
+// Matrix functions
 void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
 void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z);
 void mat4Identity(GLfloat M[]);
@@ -45,7 +51,7 @@ int main()
 
 
 	// Create window object
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Bouncy Ball", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Bouncy Ball", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -56,6 +62,7 @@ int main()
 	glfwMakeContextCurrent(window);
 	// Tell GLFW we want to use our resize callback function on every window resize
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetWindowAspectRatio(window, 4, 3);
 
 	// Initialize GLAD (load all function pointers for OpenGL)
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -67,80 +74,113 @@ int main()
 	// Modelview matrix
 	GLfloat MV[16] = {0};
 	// Position the object in front of the camera
-	mat4Translate(MV, 0.0f, 0.0f, -100.0f);
+	mat4Translate(MV, 0.0f, 0.0f, -50.0f);
 
 	// Perspective matrix
 	GLfloat P[16] = {0};
-	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f);
+	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
 
-	Shader softBodyShader("Shaders//SoftBody//vertex.glsl", "Shaders//SoftBody//fragment.glsl");
+	// Shader instance for our bouncy ball
+	Shader mainShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
 	// Settings for the simulation model of the softbody
 	Settings settings = {};
-	settings.h = 0.01f; // Step
-	settings.k = 0.5f; // Spring constant
-	settings.b = 0.005f; // Resistance constant
+	settings.h = 0.01f; // Step size
+	settings.k = 0.1f; // Spring constant
+	settings.b = settings.k/50.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	settings.DIM = 3; // 2-D
-	settings.RADIUS = 20.0f;
-	settings.WEIGHT = 5.0f; // Total weight of the system
+	settings.DIM = 3; // 3-D (x,y,z)
+	settings.RADIUS = 10.0f;
+	settings.WEIGHT = 1.0f; // Total weight of the system
+	settings.TIME_DURATION = 5.0f; // Specifies how long the simulation should be (given in seconds)
+	settings.NUM_STEPS = settings.TIME_DURATION / settings.h; // Specifies how many steps the simulation will be calculated
+	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
 
-	// Create a sphere mesh
-	int numHorizontalSegments = 8; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
+	// Create a sphere mesh (for the softbody)
+	int numHorizontalSegments = 16 ; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	Mesh sphere;
 	sphere.createSphere(numHorizontalSegments, settings.RADIUS);
 	
-	// Initiate a softbody instance
+	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
-
 	// Set the mesh of our softbody to the sphere created earlier
 	bouncyBall.setMesh(&sphere);
-	
 	// Set up all the matrices needed for the simulation
-	bouncyBall.setupSimulationModel(settings);
+	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
 
-	// Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	// Hide the back face of the triangles
-	//glEnable(GL_CULL_FACE);
+	// Create a XZ-plane as floor
+	Mesh floor;
+	floor.createPlaneXZ(100.0f, 100.0f);
 
 	// Time variable
 	GLfloat time = (GLfloat)glfwGetTime();
+	GLfloat deltaTime = 0.0f;
 
-	// Pointer for passing particle position array into the shader
-	GLfloat* positions = bouncyBall.getParticlePositionArray();
+	// A matrix to store all simulation cycles in
+	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
+
+	// A flag to see if the simulation is loaded
+	bool simulationIsLoaded = false;
+	// Counter to keep track of which simulation step to render
+	int stepCounter = 1;
+
+	// Wireframe mode
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	// Hide the back face of the triangles
+	glEnable(GL_CULL_FACE);
+	glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
 	{
+		// Check if the simulation is loaded (always false on first run)
+		if (simulationIsLoaded == false) {
+			// Compute the entire simulation with specified number of steps
+			simulationIsLoaded = loadSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings, settings.NUM_STEPS);
+		}
+
 		// Read input
 		processInput(window);
 
 		// Rendering commands here
-		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		// Calculate one cycle of the simulation
-		bouncyBall.updateSimulationModel(settings);
-
 		// Activate shader
-		softBodyShader.use();
+		mainShader.use();
 
-		// Update time and pass in to the shader
-		time = (GLfloat)glfwGetTime();
-		softBodyShader.setFloat("time", time);
-
+		// Place the floor
+		mat4Translate(MV, 0.0f, -settings.RADIUS*2.0f, -50.0f);
 		// Model View Matrix
-		softBodyShader.setFloatMat4("MV", MV);
-		 // Projection Matrix
-		softBodyShader.setFloatMat4("P", P);
+		mainShader.setFloatMat4("MV", MV);
+		floor.render();
 
-		// Insert particle positions in shader
-		positions = bouncyBall.getParticlePositionArray();
-		softBodyShader.setFloat("positions", positions, settings.DIM * settings.NUM_POINTS);
+		// Place sphere infront of the camera
+		mat4Translate(MV, 0.0f, 0.0f, -50.0f);
+		// Model View Matrix
+		mainShader.setFloatMat4("MV", MV);
+		// Projection Matrix
+		mainShader.setFloatMat4("P", P);
 
-		// Draw object
-		bouncyBall.render();
+		// Render (draw) the simulation one step at the time
+		renderSimulationStep(
+			stepCounter, // Keeps count of which simulation step to draw
+			settings.NUM_STEPS, // Number of steps of the entire simulation
+			settings, // Struct that contains specifications about the simulation
+			PARTICLE_POSITION_DATA, // A matrix that stores all simulation steps
+			bouncyBall // SoftBody simulation model (contains all information about the simulation)
+		);
+
+		// Update current time
+		GLfloat currentTime = (GLfloat)glfwGetTime();
+		// Calculate time passed since last render
+		deltaTime = currentTime - time;
+		// Update time
+		time = currentTime;
+
+		// Hold each frame for a specified number of seconds (its based on step size of the simulation right now)
+		while ((currentTime - time) < (settings.h - deltaTime)) {
+			currentTime = (GLfloat)glfwGetTime();
+		}
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
@@ -151,6 +191,67 @@ int main()
 	glfwTerminate();
 
 	return 0;
+}
+
+
+bool loadSimulation(GLFWwindow* window, SoftBody &softBody, Matrix &PARTICLE_POSITION_DATA, Settings &settings, const int NUM_STEPS)
+{
+	// Title string to display loading progress
+	static char titleString[200];
+
+	// Run the simulation for specified number of steps
+	for (int i = 1; i <= NUM_STEPS; ++i) {
+		// Clear screen
+		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// Calculate one cycle of the simulation
+		softBody.updateSimulationModel(settings);
+
+		// Store the calculated step as a row in a matrix
+		for (int j = 0; j < settings.NUM_POINTS*settings.DIM; ++j) {
+			PARTICLE_POSITION_DATA(i, j + 1) = softBody.getParticlePositionArray()[j];
+		}
+
+		// Compute the percentage of completion
+		float progress = 100.0f * (float)i / (float)NUM_STEPS;
+		// Compose a string with loading progress message
+		sprintf_s(titleString, "Bouncy Ball, Loading Simulation: %.1f %%", progress);
+		// Display loading progress in the window title
+		glfwSetWindowTitle(window, titleString);
+
+		// Swap buffers and check for keyboard input or mouse movement events
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+	return true;
+}
+
+void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody )
+{
+	// Pointer to the vertex array of the mesh
+	GLfloat* vertexArray = softBody.getMeshVertexArray();
+
+	// Update the vertex array of the mesh from the simulated position data
+	for (int i = 0; i < settings.NUM_POINTS; ++i) {
+		vertexArray[i * 8] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 1);
+		vertexArray[(i * 8) + 1] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 2);
+		vertexArray[(i * 8) + 2] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 3);
+	}
+
+	// Update vertex buffer with new vertex array
+	softBody.updatePositions();
+
+	// Draw object
+	softBody.render();
+
+	// Incremet the counter to the next simulation step, if the counter has reached maximum number of steps, reset counter
+	++stepCounter;
+	if (stepCounter >= NUM_STEPS) {
+		stepCounter = 1;
+	}
+	vertexArray = nullptr;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -174,10 +275,10 @@ void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect,
 
 	GLfloat f = cos(vertFov / 2) / sin(vertFov / 2);
 
-	M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;                       M[12] = 0.0f;
-	M[1] = 0.0f;     M[5] = f;    M[9] = 0.0f;                       M[13] = 0.0f;
-	M[2] = 0.0f;     M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
-	M[3] = 0.0f;     M[7] = 0.0f; M[11] = -1.0f;                      M[15] = 0.0f;
+	M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;                              M[12] = 0.0f;
+	M[1] = 0.0f;       M[5] = f;    M[9] = 0.0f;                              M[13] = 0.0f;
+	M[2] = 0.0f;       M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
+	M[3] = 0.0f;       M[7] = 0.0f; M[11] = -1.0f;                            M[15] = 0.0f;
 }
 
 void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z) {
