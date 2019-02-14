@@ -82,28 +82,36 @@ for cycle=1:CYCLES -1
         % Calculate the mid point of the ledge
         midPoint = 2*linePoints(:, 1, currentLedge)-linePoints(:, 2, currentLedge);
         
-        normalRange = 0.5 *sqrt((linePoints(2, 2, currentLedge)-linePoints(1, 2, currentLedge))^2 + (linePoints(2, 1, currentLedge)-linePoints(1, 1, currentLedge))^2);
+        % Calculate the normal-line of the line
+%         normalLine = [tilt 1 midPointY-cross];
+        % -------------------------------------------------
+        % Normal _vector_
         dx = linePoints(1, 2, currentLedge)- linePoints(1, 1, currentLedge);
         dy = linePoints(2, 2, currentLedge)- linePoints(2, 1, currentLedge);
         normalV = [dy -dx];
-        normalV= normalV/norm(normalV);
+        normalV= normalV/norm(normalV);        
+        lineRadious = 0.5 *sqrt((linePoints(2, 1, currentLedge)-linePoints(2, 2, currentLedge))^2 + (linePoints(1, 1, currentLedge)-linePoints(1, 2, currentLedge))^2);
         %--------------------------------------------------
         % Each point's distance to the line
         distanceFromLine = (X(:,1)* line(1) + X(:,2)*line(2) + line(3))/(line(1).^2+line(2).^2 );
         
         % Distance from the normal
-        distanceFromMid = sqrt(((X(:,1)-midPoint(1)).^2 + (X(:,2)-midPoint(2)).^2));
-        
+        distanceFromMid = sqrt((X(:, 1)-midPoint(1)).^2 + (X(:, 2)-midPoint(2)).^2);
+
         % The indicies of the points below the line
         IndeciesBelowLine = zeros(1, size(X, 1));
         IndeciesBelowLine(distanceFromLine<0) = 1;
         
+        % The indicies of the points TOO FAR below the line
+        IndeciesTOOFARBelowLine = ones(1, size(X, 1));
+        IndeciesTOOFARBelowLine(distanceFromLine<-10) = 0;
+        
         % The indicies of the points close to the normal
         IndeciesCloseToNormal = zeros(1, size(X, 1));
-        IndeciesCloseToNormal(abs(distanceFromMid) > normalRange) = 1;
+        IndeciesCloseToNormal(abs(distanceFromMid) > lineRadious) = 1;
         %--------------------------------------------------
         
-        IndicesInContact = IndeciesCloseToNormal.*IndeciesBelowLine;
+        IndicesInContact = IndeciesTOOFARBelowLine.*IndeciesBelowLine;
         TheIndices = find(IndicesInContact);
         
         if (length(TheIndices) > 0)
@@ -122,9 +130,10 @@ end
 
 % ANIMATION
 % Stop the animation by pressing CTRL + C in the command window
-for i = 1:CYCLES
+for i = 1:3:CYCLES
     clf;
     hold on;
+    plot([-10 50], [-20 40]);
     plot([10 50], [0 40]);
     plot([-20 10], [10 -20]); 
     
@@ -136,7 +145,7 @@ for i = 1:CYCLES
     ylim([-100 100]);
     
     % used to set frame time but drawing takes time so it's not accurate
-    pause(h); 
+    pause(0); 
 end
 
 
