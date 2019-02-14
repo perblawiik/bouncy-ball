@@ -4,28 +4,16 @@
 
 #include "Shader.h"
 #include "Matrix.h"
+#include "SoftBody.h"
+#include "Structs.h"
+#include "Mesh.h"
 
 #include <iostream>
 
 /** CONSTANTS **/
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-const GLfloat PI = 3.14159265359f;
-
-/** STRUCTS **/
-// Struct with all constant values for the simulation
-struct Settings 
-{
-	GLfloat h; // Step
-	GLfloat k; // Spring constant
-	GLfloat b; // Resistance constant
-	GLfloat g; // Gravitation constant
-	GLfloat SPHERE_RADIUS; // Radius of the bouncy ball
-
-	GLint NUM_BONDS;
-	GLint NUM_POINTS;
-	GLint DIM;
-};
+const unsigned int WINDOW_WIDTH = GLOBAL_CONSTANTS::window::WIDTH;
+const unsigned int WINDOW_HEIGHT = GLOBAL_CONSTANTS::window::HEIGHT;
+const GLfloat PI = GLOBAL_CONSTANTS::PI;
 
 /** FUNCTION DECLARATIONS **/
 // A callback function on the window that gets called each time the window is resized
@@ -34,13 +22,16 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 // Checks if a key is currently being pressed
 void processInput(GLFWwindow *window);
 
-// Calculates differential equations of the system
-void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Matrix &V, Matrix &Vp,
-	Matrix &Fk, Matrix &Fkp, Matrix &zeros, Matrix &vec1, Matrix &vec2, Matrix &diff);
+// Load simulation with specified number of steps and store all particle positions in a single matrix.
+// Returns true when the simulation is loaded.
+bool loadSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITION_DATA, Settings &settings, const int NUM_STEPS);
+// Render one cycle of the simulation, if step counter is larger than total steps, the step counter is reset to 1
+void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody);
 
-// Perspective matrix
+// Matrix functions
 void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
 void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z);
+void mat4Identity(GLfloat M[]);
 
 int main() 
 {
@@ -60,7 +51,7 @@ int main()
 
 
 	// Create window object
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Bouncy Ball", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Bouncy Ball", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -71,6 +62,7 @@ int main()
 	glfwMakeContextCurrent(window);
 	// Tell GLFW we want to use our resize callback function on every window resize
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetWindowAspectRatio(window, 4, 3);
 
 	// Initialize GLAD (load all function pointers for OpenGL)
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -80,363 +72,186 @@ int main()
 	}
 
 	// Modelview matrix
-	GLfloat MV[16] = {
+	GLfloat MV[16] = {0};
+	// Position the object in front of the camera
+	mat4Translate(MV, 0.0f, 0.0f, -50.0f);
 
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
-	mat4Translate(MV, 0.0f, 0.0f, -100.0f);
 	// Perspective matrix
-	GLfloat P[16] = {
+	GLfloat P[16] = {0};
+	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
 
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
-	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f);
+	// Shader instance for our bouncy ball
+	Shader mainShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 
-	Shader myShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
-
-	// Columns per row in the vertex array (coordinates + normals)
-	int stride = 6;
-	
-	// Number of horizontal segments of the sphere (2 is minimum)
-	int numHorizontalSegments = 8;
-	int numVerticalSegments = 2 * numHorizontalSegments;
-	int numVertices = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
-	std::cout << "Number of vertices: " << numVertices << std::endl;
-	int numTriangles = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
-	std::cout << "Number of triangles: " << numTriangles << std::endl;
-	std::cout << "Vertex array size: " << 3 * numVertices << std::endl;
-	
-	GLfloat *vertices = new GLfloat[numVertices * stride]; // Initialize vertex array
-	GLuint *indices = new GLuint[numTriangles * 3]; // Initialize index array
-	GLfloat sphereRadius = 20.0f;
-	std::cout << "Radius: " << sphereRadius << std::endl;
-
-	/** Generate vertex array **/
-	// Bottom vertex
-	vertices[0] = 0.0f; vertices[1] = -sphereRadius; vertices[2] = 0.0f; // Coordinates
-	vertices[3] = 0.0f; vertices[4] = -sphereRadius; vertices[5] = 0.0f; // Normal
-
-	GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
-	GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
-	GLfloat phi = 0; // Begin at Z = 0 (Z € 0 < phi < 2PI )
-
-	// Generate middle part vertices with normals
-	int index = 5; // Skip first 6 (the bottom vertex with normal already specified)
-	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
-
-		float Y = sphereRadius*cos(theta); // Y-coordinate
-		float R = sphereRadius*sin(theta); // radius
-
-		for (int j = 0; j < numVerticalSegments; ++j) {
-			// Vertex (x, y, z)
-			vertices[++index] = R * sin(phi);
-			vertices[++index] = Y;
-			vertices[++index] = R * cos(phi);
-			// Normal (x, y, z)
-			vertices[++index] = R * sin(phi);
-			vertices[++index] = Y;
-			vertices[++index] = R * cos(phi);
-
-			phi += sampleRate;
-		}
-		theta += sampleRate;
-	}
-
-	// Top vertex
-	vertices[++index] = 0.0f; vertices[++index] = sphereRadius; vertices[++index] = 0.0f;
-	vertices[++index] = 0.0f; vertices[++index] = sphereRadius; vertices[++index] = 0.0f;
-	
-	/** Generate index array */
-	// Bottom cap
-	index = -1;
-	for (int i = 0; i < numVerticalSegments; ++i) {
-
-		indices[++index] = 0;
-
-		if ((i + 2) <= numVerticalSegments) {
-			indices[++index] = i + 2;
-		}
-		else {
-			indices[++index] = (i + 2) - numVerticalSegments;
-		}
-		indices[++index] = i + 1;
-	}
-	
-	// Middle part
-	int v0 = 1;
-	for (int i = 0; i < numHorizontalSegments - 2; i++) {
-		for (int j = 0; j < numVerticalSegments-1; ++j) {
-			// One rectangle at a time (two triangles)
-			indices[++index] = v0;
-			indices[++index] = v0 + 1;
-			indices[++index] = numVerticalSegments + v0;
-			indices[++index] = v0 + 1;
-			indices[++index] = numVerticalSegments + v0 + 1;
-			indices[++index] = numVerticalSegments + v0;
-			++v0;
-		}
-		indices[++index] = v0;
-		indices[++index] = (v0 + 1) - numVerticalSegments;
-		indices[++index] = numVerticalSegments + v0;
-		indices[++index] = (v0 + 1) - numVerticalSegments;
-		indices[++index] = v0 + 1;
-		indices[++index] = numVerticalSegments + v0;
-		++v0;
-	}
-	
-	// Top cap
-	int lastVertexIndex = numVertices - 1;
-	for (int i = 0; i < numVerticalSegments; ++i) {
-
-		indices[++index] = lastVertexIndex;
-
-		if ((lastVertexIndex - 2 - i) >= lastVertexIndex - numVerticalSegments) {
-			indices[++index] = lastVertexIndex - 2 - i;
-		}
-		else {
-			indices[++index] = lastVertexIndex - numVerticalSegments - 1;
-		}
-
-		indices[++index] = lastVertexIndex - 1 - i;
-	}
-
-	// Vertex Buffer Object, Vertex Array Object, Element Buffer Object
-	GLuint VBO, VAO, EBO;
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
-	glGenVertexArrays(1, &VAO);
-
-	// 1. Bind Vertex Array Object
-	glBindVertexArray(VAO);
-	// 2. Copy our vertices array in a buffer for OpenGL to use
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, stride * numVertices * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-	// 3. Copy our index array in a element buffer for OpenGL to use
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * numTriangles * sizeof(GLuint), indices, GL_STATIC_DRAW);
-
-	// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
-	// glVertexAttribPointer Parameters :
-	// 1. Specifies which vertex attribute we want to configure. 
-	//	  This sets the location of the vertex attribute to 0 and since we want to pass data to this vertex attribute, we pass in 0.
-	// 2. Specifies the size of the vertex attribute (vec3 is composed of 3 values).
-	// 3. Specifies the type of the data (float in this case)
-	// 4. Specifies if we want the data to be normalized.
-	// 5. Known as "the stride" and tells us the space between consecutive vertex attributes. 
-	//    Since the next set of position data is located exactly 3 times the size of a float away we specify that value as the stride.
-	// 6. This is the offset of where the position data begins in the buffer. 
-	//    Since the position data is at the start of the data array this value is just 0.
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)0); // Vertex coordinates
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); // normals
-	glEnableVertexAttribArray(0); // Vertex coordinates
-	glEnableVertexAttribArray(1); // Normals
-
-	// Deactivate (unbind) the VAO and the buffers again.
-	// Do NOT unbind the index buffer while the VAO is still bound.
-	// The index buffer is an essential part of the VAO state.
-	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	/**********S I M U L A T I O N**********/
-
+	// Settings for the simulation model of the softbody
 	Settings settings = {};
-	settings.h = 0.01f; // Step
-	settings.k = 8.0f; // Spring constant
-	settings.b = 0.2f; // Resistance constant
+	settings.h = 0.01f; // Step size
+	settings.k = 0.1f; // Spring constant
+	settings.b = settings.k/50.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
-	//settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + (numVertices/2); // Total number of bonds
-	settings.NUM_BONDS = ((2 * numHorizontalSegments * numVerticalSegments) - numVerticalSegments) + numVertices;
-	settings.NUM_POINTS = numVertices + 1; // Total number of points (particles)
-	settings.DIM = 3; // 2-D
-	settings.SPHERE_RADIUS = sphereRadius;
+	settings.DIM = 3; // 3-D (x,y,z)
+	settings.RADIUS = 10.0f;
+	settings.WEIGHT = 1.0f; // Total weight of the system
+	settings.TIME_DURATION = 5.0f; // Specifies how long the simulation should be (given in seconds)
+	settings.NUM_STEPS = settings.TIME_DURATION / settings.h; // Specifies how many steps the simulation will be calculated
+	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
 
-	// Total weight of the system
-	const float WEIGHT = 5.0f;
+	// Create a sphere mesh (for the softbody)
+	int numHorizontalSegments = 16 ; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
+	Mesh sphere;
+	sphere.createSphere(numHorizontalSegments, settings.RADIUS);
+	
+	// The bouncy ball is a softbody simulation
+	SoftBody bouncyBall;
+	// Set the mesh of our softbody to the sphere created earlier
+	bouncyBall.setMesh(&sphere);
+	// Set up all the matrices needed for the simulation
+	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
 
-	//Masses per particle
-	Matrix m(settings.NUM_POINTS, 1); // Create Nx1 matrix
-	for (int i = 0; i < m.size(); ++i) {
-		m[i] = WEIGHT / (float)settings.NUM_POINTS; // All masses divided equally
-	}
+	// Create a XZ-plane as floor
+	Mesh floor;
+	floor.createPlaneXZ(100.0f, 100.0f);
 
-	//Particle x, y Pos [Xx Xy] / per particle
-	Matrix X(settings.NUM_POINTS, settings.DIM);
-	for (int i = 0; i < settings.NUM_POINTS; ++i) {
-		X[i * settings.DIM] = vertices[i * stride];
-		X[i * settings.DIM + 1] = vertices[i * stride + 1];
-		X[i * settings.DIM + 2] = vertices[i * stride + 2];
-	}
-	X(X.numRows(), 1) = 0.0f;
-	X(X.numRows(), 2) = 0.0f;
-	X(X.numRows(), 3) = 0.0f;
+	// Time variable
+	GLfloat time = (GLfloat)glfwGetTime();
+	GLfloat deltaTime = 0.0f;
 
-	// Indice table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
-	Matrix I(settings.NUM_BONDS, 2);
-	std::cout << "Number of springs: " << settings.NUM_BONDS << std::endl;
-	index = 1;
-	// Generate horizontal spring bond between the particles 
-	for (int i = 0; i < numHorizontalSegments - 1; ++i) {
+	// A matrix to store all simulation cycles in
+	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
 
-		int n = (i * numVerticalSegments) + 2;
-		for (int j = 0; j < numVerticalSegments - 1; ++j) {
-			I(index, 1) = (float)(n + j);
-			I(index, 2) = (float)(n + j + 1);
-			++index;
-		}
-		I(index, 1) = I((index - 1), 2);
-		I(index, 2) = (float)n;
-		++index;
-	}
-
-	// Generate vertical spring bond between the particles 
-	for (int i = 1; i <= numVerticalSegments; ++i) {
-
-		int n = 1;
-		int m = (n + i);
-
-		// Bottom part
-		I(index, 1) = (float)n;
-		I(index, 2) = (float)m;
-		++index;
-
-		// Middle part
-		for (int j = 0; j < numHorizontalSegments - 2; ++j) {
-
-			I(index, 1) = (float)m;
-			I(index, 2) = (float)(m + numVerticalSegments);
-			++index;
-			m = m + numVerticalSegments;
-		}
-
-		// Top part
-		I(index, 1) = (float)m;
-		I(index, 2) = (float)numVertices;
-		++index;
-	}
-
-	for (int row = 1; row <= settings.NUM_POINTS-1; ++row) {
-		I(index, 1) = (float)row;
-		I(index, 2) = (float)settings.NUM_POINTS;
-		std::cout << I(index, 1) << " " << I(index, 2) << std::endl;
-		++index;
-	}
-
-	/*
-	// Generate diagonal spring bonds through the diameter of the sphere
-	for (int i = 1; i <= numHorizontalSegments; ++i) {
-
-		int lower = 1;
-		int upper = (numVertices - 1 - numHorizontalSegments);
-		int m = (lower + i);
-		int n = (upper + i);
-
-		for (int j = 0; j < numHorizontalSegments - 1; ++j) {
-
-			I(index, 1) = (float)m;
-			I(index, 2) = (float)(n);
-			++index;
-			m = m + numVerticalSegments;
-			n = n - numVerticalSegments;
-		}
-	}
-
-	// Top and bottom bond
-	I(index, 1) = 1.0f;
-	I(index, 2) = (float)(numVerticalSegments);
-	*/
-
-	// Starting velocity [Vx Vy]/ per particle
-	Matrix V(settings.NUM_POINTS, settings.DIM); // All set to zero by default
-
-	// Acceleration dV/dt 
-	Matrix Vp(settings.NUM_POINTS, settings.DIM); // All set to zero by default
-
-	// Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation) 
-	Matrix Fk(settings.NUM_BONDS, settings.DIM); // All set to zero by default
-
-	// Fkp = dFp/dt
-	Matrix Fkp(settings.NUM_BONDS, settings.DIM); // All set to zero by default
-
-	// Used to set Vp to zero each cycle
-	Matrix zeros(settings.NUM_POINTS, settings.DIM);
-
-	// Dummy vectors (1xDIM matrix)
-	Matrix vec1(1, settings.DIM);
-	Matrix vec2(1, settings.DIM);
-
-	// Vector from point 1 to point 2;
-	Matrix diff(1, settings.DIM);
-
-	/***************************************/
+	// A flag to see if the simulation is loaded
+	bool simulationIsLoaded = false;
+	// Counter to keep track of which simulation step to render
+	int stepCounter = 1;
 
 	// Wireframe mode
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	// Hide the back face of the triangles
 	glEnable(GL_CULL_FACE);
-
-	// Time variable
-	GLfloat time = (GLfloat)glfwGetTime();
+	glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
 	{
+		// Check if the simulation is loaded (always false on first run)
+		if (simulationIsLoaded == false) {
+			// Compute the entire simulation with specified number of steps
+			simulationIsLoaded = loadSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings, settings.NUM_STEPS);
+		}
+
 		// Read input
 		processInput(window);
 
 		// Rendering commands here
-		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		/**********S I M U L A T I O N**********/
-		//-------------------------------------//
-
-		// Calculate one cycle for the system
-		calculateSimulation(settings, m, X, I, V, Vp, Fk, Fkp, zeros, vec1, vec2, diff);
-
-		//-------------------------------------//
-		/***************************************/
-
 		// Activate shader
-		myShader.use();
+		mainShader.use();
 
-		// Update time and pass in to the shader
-		time = (GLfloat)glfwGetTime();
-		myShader.setFloat("time", time);
-
+		// Place the floor
+		mat4Translate(MV, 0.0f, -settings.RADIUS*2.0f, -50.0f);
 		// Model View Matrix
-		myShader.setFloatMat4("MV", MV);
-		 // Projection Matrix
-		myShader.setFloatMat4("P", P);
-		// Insert particle positions in shader
-		myShader.setFloat("positions", X.getValues(), X.size());
+		mainShader.setFloatMat4("MV", MV);
+		floor.render();
 
-		// Draw object
-		glBindVertexArray(VAO);
-		// (mode, vertex count, type, element array buffer offset)
-		glDrawElements(GL_TRIANGLES, numTriangles * 3, GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
+		// Place sphere infront of the camera
+		mat4Translate(MV, 0.0f, 0.0f, -50.0f);
+		// Model View Matrix
+		mainShader.setFloatMat4("MV", MV);
+		// Projection Matrix
+		mainShader.setFloatMat4("P", P);
+
+		// Render (draw) the simulation one step at the time
+		renderSimulationStep(
+			stepCounter, // Keeps count of which simulation step to draw
+			settings.NUM_STEPS, // Number of steps of the entire simulation
+			settings, // Struct that contains specifications about the simulation
+			PARTICLE_POSITION_DATA, // A matrix that stores all simulation steps
+			bouncyBall // SoftBody simulation model (contains all information about the simulation)
+		);
+
+		// Update current time
+		GLfloat currentTime = (GLfloat)glfwGetTime();
+		// Calculate time passed since last render
+		deltaTime = currentTime - time;
+		// Update time
+		time = currentTime;
+
+		// Hold each frame for a specified number of seconds (its based on step size of the simulation right now)
+		while ((currentTime - time) < (settings.h - deltaTime)) {
+			currentTime = (GLfloat)glfwGetTime();
+		}
 		
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
-	// OPTIONAL: de-allocate all resources once they've outlived their purpose:
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
-
 	// Clean up all the resources and properly exit the application
 	glfwTerminate();
 
 	return 0;
+}
+
+
+bool loadSimulation(GLFWwindow* window, SoftBody &softBody, Matrix &PARTICLE_POSITION_DATA, Settings &settings, const int NUM_STEPS)
+{
+	// Title string to display loading progress
+	static char titleString[200];
+
+	// Run the simulation for specified number of steps
+	for (int i = 1; i <= NUM_STEPS; ++i) {
+		// Clear screen
+		glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// Calculate one cycle of the simulation
+		softBody.updateSimulationModel(settings);
+
+		// Store the calculated step as a row in a matrix
+		for (int j = 0; j < settings.NUM_POINTS*settings.DIM; ++j) {
+			PARTICLE_POSITION_DATA(i, j + 1) = softBody.getParticlePositionArray()[j];
+		}
+
+		// Compute the percentage of completion
+		float progress = 100.0f * (float)i / (float)NUM_STEPS;
+		// Compose a string with loading progress message
+		sprintf_s(titleString, "Bouncy Ball, Loading Simulation: %.1f %%", progress);
+		// Display loading progress in the window title
+		glfwSetWindowTitle(window, titleString);
+
+		// Swap buffers and check for keyboard input or mouse movement events
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+
+	return true;
+}
+
+void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody )
+{
+	// Pointer to the vertex array of the mesh
+	GLfloat* vertexArray = softBody.getMeshVertexArray();
+
+	// Update the vertex array of the mesh from the simulated position data
+	for (int i = 0; i < settings.NUM_POINTS; ++i) {
+		vertexArray[i * 8] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 1);
+		vertexArray[(i * 8) + 1] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 2);
+		vertexArray[(i * 8) + 2] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 3);
+	}
+
+	// Update vertex buffer with new vertex array
+	softBody.updatePositions();
+
+	// Draw object
+	softBody.render();
+
+	// Incremet the counter to the next simulation step, if the counter has reached maximum number of steps, reset counter
+	++stepCounter;
+	if (stepCounter >= NUM_STEPS) {
+		stepCounter = 1;
+	}
+	vertexArray = nullptr;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -451,69 +266,6 @@ void processInput(GLFWwindow* window)
 		glfwSetWindowShouldClose(window, true);
 }
 
-void calculateSimulation(const Settings &s, Matrix &m, Matrix &X, Matrix &I, Matrix &V, Matrix &Vp,
-	Matrix &Fk, Matrix &Fkp, Matrix &zeros, Matrix &vec1, Matrix &vec2, Matrix &diff)
-{
-	// Set to zero so the components from each connected spring can be += and added separately
-	Vp = zeros; 
-	for (int n = 1; n <= s.NUM_BONDS; ++n) // Loop through the springs
-	{
-		int index1 = (int)I(n, 1); // Index from point 1
-		int index2 = (int)I(n, 2); // Index from point 2
-
-		// Get point coordinates based on bond indices I
-		X.copyRow(index1, vec1); // Copy position of point 1 to vec1
-		X.copyRow(index2, vec2); // Copy position of point 2 to vec2
-
-		// Vector from point 1 to 2
-		diff = vec1 - vec2; 
-
-		// Normalise it, used to give the Fk and Fb direction
-		diff.normalize();
-
-		// Get deltaV, speed difference between the particles in the spring's direction
-		V.copyRow(index1, vec1); // Copy velocity of point 1 to vec1
-		V.copyRow(index2, vec2); // Copy velocity of point 2 to vec2
-		float dV = diff.dot(vec1 - vec2);
-
-		// Apply spring influence to the connected particles, 
-		// first one (Vp1) is added, second is subtracted, in the springs direction since they will be either
-		// both pulled towards eachother or drawn away from eachother.
-		Vp.copyRow(index1, vec1); // Copy acceleration of point 1 to vec1
-		Vp.copyRow(index2, vec2); // Copy acceleration of point 2 to vec2
-		float m1 = m(index1, 1); // Mass of point 1
-		float m2 = m(index2, 1); // Mass of point 2
-		float F = Fk(n, 1); // Spring force
-		Vp.replaceRow(index1, vec1 - (diff * (1.0f / m1) * (s.b*dV + F))); 
-		Vp.replaceRow(index2, vec2 + (diff * (1.0f / m2) * (s.b*dV + F)));
-
-		// The derivative for Fk
-		Fkp(n, 1) = s.k * dV;
-	}
-
-	// Add gravity for all points (-g to y coordinate)
-	
-	for (int r = 1; r <= s.NUM_POINTS; ++r) { 
-		Vp(r, 2) = Vp(r, 2) - s.g;
-	}
-	
-	// Approximating the new values using: X_n + 1 = X_n + h * X'_n
-	// (they're not supressed for debugging purposes)
-	V = V + (Vp * s.h);
-	Fk = Fk + (Fkp * s.h);
-	X = X + (V * s.h);
-
-	 // Code that flips Y - ward velocity when the particle has Xy < -4.0 
-	for (int j = 1; j <= s.NUM_POINTS; ++j) {
-		 
-		if (X(j, 2) < (-s.SPHERE_RADIUS * 2)) {
-			V(j, 2) = 0.0f;
-			X(j, 2) = -s.SPHERE_RADIUS * 2;
-		}
-	}
-}
-
-
 // M is the matrix we want to create (an output argument )
 // vertFov is the vertical field of view (in the y direction )
 // aspect is the aspect ratio of the viewport ( width / height )
@@ -523,10 +275,10 @@ void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect,
 
 	GLfloat f = cos(vertFov / 2) / sin(vertFov / 2);
 
-	M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;                       M[12] = 0.0f;
-	M[1] = 0.0f;     M[5] = f;    M[9] = 0.0f;                       M[13] = 0.0f;
-	M[2] = 0.0f;     M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
-	M[3] = 0.0f;     M[7] = 0.0f; M[11] = -1.0f;                      M[15] = 0.0f;
+	M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;                              M[12] = 0.0f;
+	M[1] = 0.0f;       M[5] = f;    M[9] = 0.0f;                              M[13] = 0.0f;
+	M[2] = 0.0f;       M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
+	M[3] = 0.0f;       M[7] = 0.0f; M[11] = -1.0f;                            M[15] = 0.0f;
 }
 
 void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z) {
@@ -535,4 +287,12 @@ void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloa
 	M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f; M[13] = y;
 	M[2] = 0.0f; M[6] = 0.0f; M[10] = 1.0f; M[14] = z;
 	M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f; M[15] = 1.0f;
+}
+
+void mat4Identity(GLfloat M[]) {
+
+	M[0] = 1.0f; M[4] = 0.0f; M[8] = 0.0f;  M[12] = 0.0f;
+	M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f;  M[13] = 0.0f;
+	M[2] = 0.0f; M[6] = 0.0f; M[10] = 1.0f;  M[14] = 0.0f;
+	M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f;  M[15] = 1.0f;
 }
