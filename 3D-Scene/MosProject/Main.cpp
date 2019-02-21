@@ -13,6 +13,8 @@
 #include <iterator>
 #include <algorithm>
 #include <vector>
+#include <string>
+#include <sstream>
 
 /** CONSTANTS **/
 const unsigned int WINDOW_WIDTH = GLOBAL_CONSTANTS::window::WIDTH;
@@ -263,28 +265,40 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 
 void saveSimulationToTextFile(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings)
 {
-	// Out File Stream
+	// Output File Stream
 	std::ofstream outFile;
+	if (outFile) {
+		// Vertices
+		float* vertices = DATA.getValues();
+		std::ostream_iterator<float> float_out_it(outFile, "\n");
+		outFile.open("SimulationData//vertex_data.txt", std::ofstream::out);
+		std::copy(vertices, vertices + DATA.size(), float_out_it);
+		outFile.close();
 
-	// Vertices
-	float* vertices = DATA.getValues();
-	std::ostream_iterator<float> float_out_it(outFile, ",");
-	outFile.open("SimulationData//vertex_data.txt", std::ofstream::out);
-	std::copy(vertices, vertices + DATA.size(), float_out_it);
-	/*
-	long pos = outFile.tellp();
-	outFile.seekp(pos-1);
-	outFile.write("\0", 1);
-	*/
-	outFile.close();
+		// Indices
+		GLuint* indices = sb.getMeshIndexArray();
+		std::ostream_iterator<GLuint> uint_out_it(outFile, "\n");
+		outFile.open("SimulationData//index_data.txt", std::ofstream::out);
+		std::copy(indices, indices + (sb.getNumMeshVertices() * 3), float_out_it);
+		outFile.close();
+	}
 
-	// Indices
-	GLuint* indices = sb.getMeshIndexArray();
-	std::ostream_iterator<GLuint> uint_out_it(outFile, ",");
-	outFile.open("SimulationData//index_data.txt", std::ofstream::out);
-	std::copy(indices, indices + (sb.getNumMeshVertices() * 3), float_out_it);
-	outFile.close();
+	// Input File Stream
+	std::ifstream inFile;
+	if (inFile) {
 
+		std::string line;
+		float index;
+
+		inFile.open("SimulationData//index_data.txt", std::ifstream::in);
+		while (std::getline(inFile, line))
+		{
+			// Convert to int
+			index = std::stoi(line);
+			std::cout << index << std::endl;
+		}
+ 		inFile.close();
+	}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
