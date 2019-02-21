@@ -9,6 +9,10 @@
 #include "Mesh.h"
 
 #include <iostream>
+#include <fstream>
+#include <iterator>
+#include <algorithm>
+#include <vector>
 
 /** CONSTANTS **/
 const unsigned int WINDOW_WIDTH = GLOBAL_CONSTANTS::window::WIDTH;
@@ -26,6 +30,8 @@ void processInput(GLFWwindow *window);
 void createSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITION_DATA, Settings &settings);
 // Render one cycle of the simulation, if step counter is larger than total steps, the step counter is reset to 1
 void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody);
+// Save simulation data to a text file
+void saveSimulationToTextFile(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings);
 
 // Matrix functions
 void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
@@ -95,7 +101,7 @@ int main()
 	settings.DIM = 3; // 3-D (x,y,z)
 	settings.RADIUS = 10.0f;
 	settings.WEIGHT = 1.0f; // Total weight of the system
-	settings.TIME_DURATION = 5.0f; // Specifies how long the simulation should be (given in seconds)
+	settings.TIME_DURATION = 1.0f; // Specifies how long the simulation should be (given in seconds)
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
 
@@ -120,6 +126,9 @@ int main()
 
 	// Compute the entire simulation with specified number of steps
 	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
+
+	// Save simulation data to a textfile with given name as parameter
+	saveSimulationToTextFile(bouncyBall, PARTICLE_POSITION_DATA, settings);
 
 	// Wireframe mode
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -250,6 +259,32 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 		stepCounter = 1;
 	}
 	vertexArray = nullptr;
+}
+
+void saveSimulationToTextFile(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings)
+{
+	// Out File Stream
+	std::ofstream outFile;
+
+	// Vertices
+	float* vertices = DATA.getValues();
+	std::ostream_iterator<float> float_out_it(outFile, ",");
+	outFile.open("SimulationData//vertex_data.txt", std::ofstream::out);
+	std::copy(vertices, vertices + DATA.size(), float_out_it);
+	/*
+	long pos = outFile.tellp();
+	outFile.seekp(pos-1);
+	outFile.write("\0", 1);
+	*/
+	outFile.close();
+
+	// Indices
+	GLuint* indices = sb.getMeshIndexArray();
+	std::ostream_iterator<GLuint> uint_out_it(outFile, ",");
+	outFile.open("SimulationData//index_data.txt", std::ofstream::out);
+	std::copy(indices, indices + (sb.getNumMeshVertices() * 3), float_out_it);
+	outFile.close();
+
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)

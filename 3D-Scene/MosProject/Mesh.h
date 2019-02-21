@@ -255,6 +255,14 @@ public:
 		return this->vertices;
 	}
 
+	GLuint* getIndexArray()
+	{
+		if (meshIsEmpty) {
+			std::cout << "WARNING! Mesh::Get Index Array::No Index Array Exists!" << std::endl;
+		}
+		return this->indices;
+	}
+
 	void render()
 	{
 		if (!meshIsEmpty) {

@@ -168,9 +168,21 @@ public:
 		return this->X.getValues();
 	}
 
+	// Return mesh vertex array used with opengl
 	GLfloat* getMeshVertexArray()
 	{
 		return mesh->getVertexArray();
+	}
+
+	// Return mesh index array used with opengl
+	GLuint* getMeshIndexArray()
+	{
+		return mesh->getIndexArray();
+	}
+
+	int getNumMeshVertices()
+	{
+		return (mesh->getNumVertices());
 	}
 
 private:
