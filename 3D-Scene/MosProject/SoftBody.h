@@ -185,6 +185,11 @@ public:
 		return (mesh->getNumVertices());
 	}
 
+	int getNumMeshTriangles()
+	{
+		return (mesh->getNumTriangles());
+	}
+
 private:
 	// Mesh for the softbody
 	Mesh* mesh;

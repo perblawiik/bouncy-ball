@@ -33,7 +33,7 @@ void createSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE
 // Render one cycle of the simulation, if step counter is larger than total steps, the step counter is reset to 1
 void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody);
 // Save simulation data to a text file
-void saveSimulationToTextFile(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings);
+void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings, const std::string &simulationName);
 
 // Matrix functions
 void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
@@ -130,7 +130,10 @@ int main()
 	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
 
 	// Save simulation data to a textfile with given name as parameter
-	saveSimulationToTextFile(bouncyBall, PARTICLE_POSITION_DATA, settings);
+	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall1");
+
+	Mesh testMesh;
+	testMesh.loadMeshData("Simulations//BouncyBall1_mesh_data.txt");
 
 	// Wireframe mode
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -148,6 +151,8 @@ int main()
 	/** RENDER LOOP **/
 	while (!glfwWindowShouldClose(window))
 	{
+		// Update current time
+		GLfloat startTime = (GLfloat)glfwGetTime();
 		// Read input
 		processInput(window);
 
@@ -164,6 +169,8 @@ int main()
 		// Draw floor
 		floor.render();
 
+		testMesh.render();
+
 		// Place sphere infront of the camera
 		mat4Translate(MV, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix
@@ -176,6 +183,10 @@ int main()
 			PARTICLE_POSITION_DATA, // A matrix that stores all simulation steps
 			bouncyBall // SoftBody simulation model (contains all information about the simulation)
 		);
+		
+		// Swap buffers and check for keyboard input or mouse movement events
+		glfwSwapBuffers(window);
+		glfwPollEvents();
 
 		// Update current time
 		GLfloat currentTime = (GLfloat)glfwGetTime();
@@ -185,13 +196,10 @@ int main()
 		time = currentTime;
 
 		// Hold each frame for a specified number of seconds (its based on step size of the simulation right now)
-		while ((currentTime - time) < (settings.h - deltaTime)) {
+		while ((currentTime - startTime) < (settings.h)) {
+
 			currentTime = (GLfloat)glfwGetTime();
 		}
-		
-		// Swap buffers and check for keyboard input or mouse movement events
-		glfwSwapBuffers(window);
-		glfwPollEvents();
 	}
 
 	// Clean up all the resources and properly exit the application
@@ -263,41 +271,63 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 	vertexArray = nullptr;
 }
 
-void saveSimulationToTextFile(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings)
+void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings, const std::string &simulationName)
 {
 	// Output File Stream
 	std::ofstream outFile;
 	if (outFile) {
-		// Vertices
-		float* vertices = DATA.getValues();
-		std::ostream_iterator<float> float_out_it(outFile, "\n");
-		outFile.open("SimulationData//vertex_data.txt", std::ofstream::out);
-		std::copy(vertices, vertices + DATA.size(), float_out_it);
-		outFile.close();
+		// Initiate output stream iterators
+		std::ostream_iterator<float> float_out_it(outFile, "\n"); // Iterator for handling floats
+		std::ostream_iterator<GLuint> uint_out_it(outFile, "\n"); // Iterator for handling integers
+		std::ostream_iterator<char> out_it_char(outFile, ""); // Iterator for handling characters
 
-		// Indices
-		GLuint* indices = sb.getMeshIndexArray();
-		std::ostream_iterator<GLuint> uint_out_it(outFile, "\n");
-		outFile.open("SimulationData//index_data.txt", std::ofstream::out);
-		std::copy(indices, indices + (sb.getNumMeshVertices() * 3), float_out_it);
-		outFile.close();
-	}
+		/** Save Simulation Data **/
+		std::string animationPath = ("Simulations//" + simulationName + "_animation_sequence.txt");
+		outFile.open(animationPath, std::ostream::out);
+		if (outFile.is_open()) {
+			// Create a string containing time step (h) and time duration (total simulation time)
 
-	// Input File Stream
-	std::ifstream inFile;
-	if (inFile) {
-
-		std::string line;
-		float index;
-
-		inFile.open("SimulationData//index_data.txt", std::ifstream::in);
-		while (std::getline(inFile, line))
-		{
-			// Convert to int
-			index = std::stoi(line);
-			std::cout << index << std::endl;
+			std::string simulationInfo = (std::to_string(simulationSettings.h) + "\n" + std::to_string(simulationSettings.TIME_DURATION) + "\n");
+			// Add number of vertices and triangles
+			std::copy(begin(simulationInfo), end(simulationInfo), out_it_char);
+			// Create pointer to the simulation data
+			float* animationSequence = DATA.getValues();
+			// Copy simulation data to the animation sequence file
+			std::copy(animationSequence, animationSequence + DATA.size(), float_out_it);
 		}
- 		inFile.close();
+		else {
+			std::cout << "WARNING! Save Simulation Sequence::Unable to open animation file" << std::endl;
+		}
+		outFile.close();
+
+		/** Save Mesh Data **/
+		std::string meshPath = ("Simulations//" + simulationName + "_mesh_data.txt");
+		outFile.open(meshPath, std::ofstream::out);
+		if (outFile.is_open()) {
+
+			int numVertices = sb.getNumMeshVertices();
+			int numTriangles = sb.getNumMeshTriangles();
+
+			// Create a string containing vertex and triangle information
+			std::string numVerticesAndTriangles = (std::to_string(numVertices) + "\n" + std::to_string(numTriangles) + "\n");
+			// Add number of vertices and triangles
+			std::copy(begin(numVerticesAndTriangles), end(numVerticesAndTriangles), out_it_char);
+
+			// Create a pointer to the vertex array
+			float* vertices = sb.getMeshVertexArray();
+			// Copy the vertex array to the mesh data file
+			std::copy(vertices, vertices + (numVertices * 8), float_out_it);
+			// Add character to separate the arrays
+			//outFile.write("#\n", 2);
+			// Create a pointer to the index array
+			GLuint* indices = sb.getMeshIndexArray();
+			// Copy the index array to the mesh data file
+			std::copy(indices, indices + (numTriangles * 3), float_out_it);
+		}
+		else {
+			std::cout << "WARNING! Save Simulation Sequence::Unable to open mesh file" << std::endl;
+		}
+		outFile.close();
 	}
 }
 

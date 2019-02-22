@@ -5,6 +5,9 @@
 #include <glad/glad.h>
 #include <math.h>
 #include <iostream>
+#include <fstream>
+#include <iterator>
+#include <string>
 
 class Mesh 
 {
@@ -53,6 +56,64 @@ public:
 	~Mesh()
 	{
 		this->clean();
+	}
+
+	void loadMeshData(const std::string &filePath)
+	{
+		meshIsEmpty = false;
+		// Input File Stream
+		std::ifstream inFile;
+		if (inFile) {
+			// Temporary string to store each read line
+			std::string line;
+
+			// Open file for reading
+			inFile.open(filePath, std::ifstream::in);
+
+			// Get number of vertices
+			std::getline(inFile, line);
+			this->numVertices = std::stoi(line);
+			// Get number of triangles
+			std::getline(inFile, line);
+			this->numTriangles = std::stoi(line);
+
+			// Vertex array
+			this->vertices = new GLfloat[this->numVertices * this->stride];
+			// Index array
+			this->indices = new GLuint[this->numTriangles * 3];
+
+			int indexCounter = 0;
+			int vertexCounter = 0;
+			while (std::getline(inFile, line))
+			{
+				if (vertexCounter < (this->numVertices * this->stride)) {
+					vertices[vertexCounter] = std::stof(line);
+					++vertexCounter;
+				}
+				else if (indexCounter < (this->numTriangles * 3)) {
+					indices[indexCounter] = std::stoi(line);
+					++indexCounter;
+				}
+			}
+			inFile.close();
+
+			// Generate ID's for buffers and vertex array to use in the shader
+			this->generateBuffersAndVertexArrayObject();
+
+			// Store our vertex array and index array in buffers for OpenGL to use
+			this->bindBuffersAndVertexArrayObject();
+
+			// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
+			this->configureVertexArrayAttributes();
+
+			// Deactivate (unbind) the VAO and the buffers again.
+			this->unbindBuffersAndVertexArrayObject();
+		}
+	}
+
+	void addAnimationSequence(const std::string &filePath)
+	{
+
 	}
 
 	void createPlaneXZ(const GLfloat &WIDTH, const GLfloat &HEIGHT)
@@ -240,6 +301,11 @@ public:
 	int getNumVertices()
 	{
 		return this->numVertices;
+	}
+
+	int getNumTriangles()
+	{
+		return this->numTriangles;
 	}
 
 	int getStride()
