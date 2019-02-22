@@ -1,5 +1,4 @@
 clear;
-close all
 
 % CONSTANTS
     % time between each approximation
@@ -11,7 +10,7 @@ b = 5;
     % gravitational constant
 g = 20;
     % Floor bounciness multiplier (0-1 preferably :3)
-fBounce = 0.2; 
+fBounce = 0.5; 
 
 % PARTICLES AND SPRINGS
 % ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
@@ -39,7 +38,7 @@ Fkp = zeros(BONDS,2);
 
 % SIMULATION
     % how many animation frames
-CYCLES = 5000;
+CYCLES = 2000;
     % where the particle animation positions are stored
 animation = zeros(POINTS,2,CYCLES); animation(:,:,1) = X;
 for cycle=1:CYCLES -1    
@@ -59,90 +58,79 @@ for cycle=1:CYCLES -1
     % approximating the new values using: X_n+1 = X_n + h*X'_n
     V  = V  + h*Vp;
     Fk = Fk + h*Fkp;
+    Xprevious = X;
     X  = X  + h*V;
     
     % COLLISION ------------------------------------------
     % The considered ledges. [x1 y1; x2 y2]
-    linePoints(:, :, 1) = [20 10; 50 40];
-    linePoints(:, :, 2) = [10 -20; -20 10];
+    linePoints(:, :, 1) = [10 5; 40 10];
+    linePoints(:, :, 2) = [0 -40; 20 -15];
+    linePoints(:, :, 3) = [-20 15; -5 -10];
+    linePoints(:, :, 4) = [10 0; 10 5];
+    linePoints(:, :, 5) = [20 -15; 10 0];
+    linePoints(:, :, 6) = [-5 -10; -15 -20];
+    linePoints(:, :, 7) = [-15 -20; -15 -30];
+    linePoints(:, :, 8) = [-15 -30; -40 -30];
+    linePoints(:, :, 9) = [-40 -50; 0 -40];
     
-    % For each ledge
-    for currentLedge = 1:2
-        % CALCULATE THE LINE ------------------------------
-        % y = k*x + m
-        % Calculate "k"
-        tilt= (linePoints(2, 2, currentLedge)-linePoints(1, 2, currentLedge))/(linePoints(2, 1, currentLedge)-linePoints(1, 1, currentLedge));
-        
-        % Calculate "m" (where the line crosses x = 0)
-        cross = linePoints(1, 2, currentLedge)-tilt*linePoints(1, 1, currentLedge);
-        
-        % Set the line
-        line = [-1*tilt 1 -1*cross];
-        
-        % Calculate the mid point of the ledge
-        midPoint = 2*linePoints(:, 1, currentLedge)-linePoints(:, 2, currentLedge);
-        
-        % Calculate the normal-line of the line
-%         normalLine = [tilt 1 midPointY-cross];
-        % -------------------------------------------------
-        % Normal _vector_
-        dx = linePoints(1, 2, currentLedge)- linePoints(1, 1, currentLedge);
-        dy = linePoints(2, 2, currentLedge)- linePoints(2, 1, currentLedge);
-        normalV = [dy -dx];
-        normalV= normalV/norm(normalV);        
-        lineRadious = 0.5 *sqrt((linePoints(2, 1, currentLedge)-linePoints(2, 2, currentLedge))^2 + (linePoints(1, 1, currentLedge)-linePoints(1, 2, currentLedge))^2);
-        %--------------------------------------------------
-        % Each point's distance to the line
-        distanceFromLine = (X(:,1)* line(1) + X(:,2)*line(2) + line(3))/(line(1).^2+line(2).^2 );
-        
-        % Distance from the normal
-        distanceFromMid = sqrt((X(:, 1)-midPoint(1)).^2 + (X(:, 2)-midPoint(2)).^2);
+%     linePoints(:, :, 1) = [11 -20; 21 0];
+%     linePoints(:, :, 2) = [21 0; 31 -20];
+    
+    
+    for currentLedge = 1:size(linePoints, 3)
+        for currentPoint = 1:POINTS
+            L0 = Xprevious(currentPoint, : )';
+            L1 = X(currentPoint,: )';
+            P0 = linePoints(1, :, currentLedge)';
+            P1 = linePoints(2, :, currentLedge)';
 
-        % The indicies of the points below the line
-        IndeciesBelowLine = zeros(1, size(X, 1));
-        IndeciesBelowLine(distanceFromLine<0) = 1;
-        
-        % The indicies of the points TOO FAR below the line
-        IndeciesTOOFARBelowLine = ones(1, size(X, 1));
-        IndeciesTOOFARBelowLine(distanceFromLine<-10) = 0;
-        
-        % The indicies of the points close to the normal
-        IndeciesCloseToNormal = zeros(1, size(X, 1));
-        IndeciesCloseToNormal(abs(distanceFromMid) > lineRadious) = 1;
-        %--------------------------------------------------
-        
-        IndicesInContact = IndeciesTOOFARBelowLine.*IndeciesBelowLine;
-        TheIndices = find(IndicesInContact);
-        
-        if (length(TheIndices) > 0)
-            % For each point below the ledge...
-            for n = 1:length(TheIndices)
-                % Stop velocity in normal direction
-                V(TheIndices(n), :) = (V(TheIndices(n), :) - normalV*dot(V(TheIndices(n), :), normalV))*0.7; % normal * norm(V(IndeciesBelowLine(n), :) *fBounce);
-            
-                % Nudge all particles to the ledge
-                X(TheIndices(n), :) =  X(TheIndices(n), :) - normalV * distanceFromLine(TheIndices(n));
+            dPx = P1(1)-P0(1);
+            dPy = P1(2)-P0(2);
+
+            Pnormal = [dPy -1*dPx];
+            Pnormal = Pnormal/norm(Pnormal);
+
+            L01 = L1 - L0;
+            P01 = P1 - P0;
+
+            if det([P01 -1*L01])~=0
+                vt = [P01 -L01]\(L0-P0);
+                v = vt(1);
+                t = vt(2);
+
+                if ( (0<=t)&&(t<=1)&&(0<=v)&&(v<=1) )
+                    L = L0 + L01*t;
+                    L = L';
+                    X(currentPoint,: ) = L - 0.01*Pnormal;
+                    V(currentPoint,: ) = (V(currentPoint,: )-Pnormal*dot(V(currentPoint,: ), Pnormal))*fBounce;
+                end
             end
-        end
-    end
+
+        end % End of the point
+    end % End the ledge
     animation(:,:,cycle + 1) = X;
 end
 
 % ANIMATION
 % Stop the animation by pressing CTRL + C in the command window
+figure(1)
+
 for i = 1:3:CYCLES
     clf;
     hold on;
-    plot([-10 50], [-20 40]);
-    plot([10 50], [0 40]);
-    plot([-20 10], [10 -20]); 
+    for ledge = 1:size(linePoints, 3)  
+        plot([linePoints(1, 1, ledge) linePoints(2, 1, ledge)], [linePoints(1, 2, ledge) linePoints(2, 2, ledge)]);
+    end
     
+%     plot([10 50], [0 40]);
+%     plot([-20 10], [10 -20]); 
+%     
     plot(animation(:,1,i),animation(:,2,i),'ro')
     for n = 1:BONDS 
         plot([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)],'b--');
     end
-    xlim([-100 100]);
-    ylim([-100 100]);
+    xlim([-50 50]);
+    ylim([-50 50]);
     
     % used to set frame time but drawing takes time so it's not accurate
     pause(0); 
