@@ -94,6 +94,7 @@ int main()
 	// Insert Projection Matrix
 	mainShader.setFloatMat4("P", P);
 
+	
 	// Settings for the simulation model of the softbody
 	Settings settings = {};
 	settings.h = 0.01f; // Time step size
@@ -103,10 +104,11 @@ int main()
 	settings.DIM = 3; // 3-D (x,y,z)
 	settings.RADIUS = 10.0f;
 	settings.WEIGHT = 1.0f; // Total weight of the system
-	settings.TIME_DURATION = 1.0f; // Specifies how long the simulation should be (given in seconds)
+	settings.TIME_DURATION = 10.0f; // Specifies how long the simulation should be (given in seconds)
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
-
+	
+	/*
 	// Create a sphere mesh (for the softbody)
 	int numHorizontalSegments = 16 ; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	Mesh sphere;
@@ -118,22 +120,47 @@ int main()
 	bouncyBall.setMesh(&sphere);
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
+	
+	// A matrix to store all simulation cycles in
+	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
+	// Compute the entire simulation with specified number of steps
+	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
+	// Save simulation data to a textfile with given name as parameter
+	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
+	*/
 
 	// Create a XZ-plane as floor
 	Mesh floor;
-	floor.createPlaneXZ(100.0f, 100.0f);
+	floor.createPlaneXZ(200.0f, 200.0f);
 
-	// A matrix to store all simulation cycles in
-	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
+	
+	Mesh ball_01;
+	ball_01.loadMeshData("BouncyBall_back_left");
+	ball_01.addAnimation("BouncyBall_back_left");
+	ball_01.startAnimation();
 
-	// Compute the entire simulation with specified number of steps
-	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
+	
+	Mesh ball_02;
+	ball_02.loadMeshData("BouncyBall_back_right");
+	ball_02.addAnimation("BouncyBall_back_right");
+	ball_02.startAnimation();
 
-	// Save simulation data to a textfile with given name as parameter
-	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall1");
+	
+	Mesh ball_03;
+	ball_03.loadMeshData("BouncyBall_front_left");
+	ball_03.addAnimation("BouncyBall_front_left");
+	ball_03.startAnimation();
 
-	Mesh testMesh;
-	testMesh.loadMeshData("Simulations//BouncyBall1_mesh_data.txt");
+	Mesh ball_04;
+	ball_04.loadMeshData("BouncyBall_straight_up");
+	ball_04.addAnimation("BouncyBall_straight_up");
+	ball_04.startAnimation();
+	
+	Mesh ball_05;
+	ball_05.loadMeshData("BouncyBall_front_right");
+	ball_05.addAnimation("BouncyBall_front_right");
+	ball_05.startAnimation();
+
 
 	// Wireframe mode
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -161,16 +188,58 @@ int main()
 
 		// Activate shader
 		mainShader.use();
-
 		// Place the floor
-		mat4Translate(MV, 0.0f, -settings.RADIUS*2.0f, -50.0f);
+		mat4Translate(MV, 0.0f, -settings.RADIUS*2.0f, -100.0f);
 		// Update with new model view matrix
 		mainShader.setFloatMat4("MV", MV);
 		// Draw floor
 		floor.render();
 
-		testMesh.render();
+		
+		// Place ball 01
+		mat4Translate(MV, -settings.RADIUS*2.0f, 0.0f, -100.0f - (settings.RADIUS*2.0f));
+		// Update with new model view matrix
+		mainShader.setFloatMat4("MV", MV);
+		// Update
+		ball_01.update();
+		// Draw
+		ball_01.render();
 
+		// Place ball 02
+		mat4Translate(MV, settings.RADIUS*2.0f, 0.0f, -100.0f - (settings.RADIUS*2.0f));
+		// Update with new model view matrix
+		mainShader.setFloatMat4("MV", MV);
+		// Update
+		ball_02.update();
+		// Draw
+		ball_02.render();
+
+		// Place ball 03
+		mat4Translate(MV, -settings.RADIUS*2.0f, 0.0f, -100.0f);
+		// Update with new model view matrix
+		mainShader.setFloatMat4("MV", MV);
+		// Update
+		ball_03.update();
+		// Draw
+		ball_03.render();
+
+		// Place ball 04
+		mat4Translate(MV, 0.0f, 0.0f, -100.0f);
+		// Update with new model view matrix
+		mainShader.setFloatMat4("MV", MV);
+		// Update
+		ball_04.update();
+		// Draw
+		ball_04.render();
+
+		// Place ball 05
+		mat4Translate(MV, settings.RADIUS*2.0f, 0.0f, -100.0f);
+		// Update with new model view matrix
+		mainShader.setFloatMat4("MV", MV);
+		ball_05.update();
+		ball_05.render();
+
+		/*
 		// Place sphere infront of the camera
 		mat4Translate(MV, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix
@@ -183,7 +252,8 @@ int main()
 			PARTICLE_POSITION_DATA, // A matrix that stores all simulation steps
 			bouncyBall // SoftBody simulation model (contains all information about the simulation)
 		);
-		
+		*/
+
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -265,7 +335,7 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 
 	// Incremet the counter to the next simulation step, if the counter has reached maximum number of steps, reset counter
 	++stepCounter;
-	if (stepCounter >= NUM_STEPS) {
+	if (stepCounter > NUM_STEPS) {
 		stepCounter = 1;
 	}
 	vertexArray = nullptr;
@@ -282,14 +352,18 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		std::ostream_iterator<char> out_it_char(outFile, ""); // Iterator for handling characters
 
 		/** Save Simulation Data **/
-		std::string animationPath = ("Simulations//" + simulationName + "_animation_sequence.txt");
+		std::string animationPath = ("Simulations//" + simulationName + ".sim");
 		outFile.open(animationPath, std::ostream::out);
 		if (outFile.is_open()) {
-			// Create a string containing time step (h) and time duration (total simulation time)
-
-			std::string simulationInfo = (std::to_string(simulationSettings.h) + "\n" + std::to_string(simulationSettings.TIME_DURATION) + "\n");
-			// Add number of vertices and triangles
+			// Create a string with time step (h), number of columns and number of rows of the simulation data matrix
+			std::string simulationInfo = (
+				std::to_string(simulationSettings.h) + "\n"
+				+ std::to_string(DATA.numRows()) + "\n"
+				+ std::to_string(DATA.numColumns()) + "\n"
+			);
+			// Add simulation information at the top of the file
 			std::copy(begin(simulationInfo), end(simulationInfo), out_it_char);
+
 			// Create pointer to the simulation data
 			float* animationSequence = DATA.getValues();
 			// Copy simulation data to the animation sequence file
@@ -301,7 +375,7 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		outFile.close();
 
 		/** Save Mesh Data **/
-		std::string meshPath = ("Simulations//" + simulationName + "_mesh_data.txt");
+		std::string meshPath = ("Simulations//" + simulationName + ".mesh");
 		outFile.open(meshPath, std::ofstream::out);
 		if (outFile.is_open()) {
 
@@ -309,7 +383,10 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 			int numTriangles = sb.getNumMeshTriangles();
 
 			// Create a string containing vertex and triangle information
-			std::string numVerticesAndTriangles = (std::to_string(numVertices) + "\n" + std::to_string(numTriangles) + "\n");
+			std::string numVerticesAndTriangles = (
+				std::to_string(numVertices) + "\n" 
+				+ std::to_string(numTriangles) + "\n"
+			);
 			// Add number of vertices and triangles
 			std::copy(begin(numVerticesAndTriangles), end(numVerticesAndTriangles), out_it_char);
 
@@ -317,8 +394,6 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 			float* vertices = sb.getMeshVertexArray();
 			// Copy the vertex array to the mesh data file
 			std::copy(vertices, vertices + (numVertices * 8), float_out_it);
-			// Add character to separate the arrays
-			//outFile.write("#\n", 2);
 			// Create a pointer to the index array
 			GLuint* indices = sb.getMeshIndexArray();
 			// Copy the index array to the mesh data file

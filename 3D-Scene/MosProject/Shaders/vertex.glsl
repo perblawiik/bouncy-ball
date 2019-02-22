@@ -25,7 +25,7 @@ void main()
     mat4 T = P * MV;
 
     // To avoid translation of the normals use only 3x3 from our 4x4 transformation matrix
-    vec3 interpolatedNormal = normalize(mat3(MV)*Position);
+    vec3 interpolatedNormal = normalize(mat3(MV)*Normal);
 
     vec3 lightDirection = normalize(vec3(1.0, 0.0, 1.0));
 

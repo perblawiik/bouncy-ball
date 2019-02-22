@@ -59,8 +59,9 @@ public:
 		// Starting velocity [Vx Vy]/ per particle
 		Matrix velocities(s.NUM_POINTS, s.DIM); // All set to zero by default
 		for (int i = 1; i < s.NUM_POINTS; ++i) {
-			//velocities(i, 1) = 5.0f;
-			//velocities(i, 2) = -50.0f;
+			velocities(i, 1) = 0.0f; // x
+			velocities(i, 2) = 30.0f; // y
+			velocities(i, 3) = 0.0f; // z
 		}
 		// Store the velocities as a member of the class
 		this->V = velocities;

@@ -9,17 +9,23 @@
 #include <iterator>
 #include <string>
 
+#include "Animation.h"
+
 class Mesh 
 {
 public:
 
 	Mesh()
-		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8)
+		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8), animation(nullptr)
 	{ }
 
 	// Copy constructor
 	Mesh(const Mesh &m)
-		: meshIsEmpty(m.meshIsEmpty), VAO(m.VAO), VBO(m.VBO), EBO(m.EBO), vertices(new GLfloat[m.numVertices * m.stride]), indices(new GLuint[m.numTriangles * 3]), numVertices(m.numVertices), numTriangles(m.numTriangles), stride(m.stride)
+		: meshIsEmpty(m.meshIsEmpty), 
+		VAO(m.VAO), VBO(m.VBO), EBO(m.EBO), 
+		vertices(new GLfloat[m.numVertices * m.stride]), indices(new GLuint[m.numTriangles * 3]), 
+		numVertices(m.numVertices), numTriangles(m.numTriangles), stride(m.stride),
+		animation(nullptr)
 	{
 		// Copy vertex array
 		for (int i = 0; i < (numVertices * stride); ++i) {
@@ -58,7 +64,7 @@ public:
 		this->clean();
 	}
 
-	void loadMeshData(const std::string &filePath)
+	void loadMeshData(const std::string &fileName)
 	{
 		meshIsEmpty = false;
 		// Input File Stream
@@ -66,6 +72,7 @@ public:
 		if (inFile) {
 			// Temporary string to store each read line
 			std::string line;
+			std::string filePath = ("Simulations//Saves//" + fileName + ".mesh");
 
 			// Open file for reading
 			inFile.open(filePath, std::ifstream::in);
@@ -111,9 +118,44 @@ public:
 		}
 	}
 
-	void addAnimationSequence(const std::string &filePath)
+	void addAnimation(const std::string &fileName)
 	{
+		if (!animation) {
 
+			// Input File Stream
+			std::ifstream inFile;
+			if (inFile) {
+				// Temporary string to store each read line
+				std::string line;
+				std::string filePath = ("Simulations//Saves//" + fileName + ".sim");
+
+				// Open file for reading
+				inFile.open(filePath, std::ifstream::in);
+
+				// Get simulation time step
+				std::getline(inFile, line);
+				float timeStep = std::stof(line);
+				// Get number of steps in the simulation
+				std::getline(inFile, line);
+				int numSteps = std::stoi(line);
+				// Get the size each vertex array
+				std::getline(inFile, line);
+				int numColumns = std::stoi(line);
+
+				// Allocate memory for the data set
+				Matrix* simulationData = new Matrix(numSteps, numColumns);
+
+				int counter = 0;
+				while (std::getline(inFile, line)) {
+
+					(*simulationData)[counter] = std::stof(line);
+					++counter;
+				}
+				inFile.close();
+
+				this->animation = new Animation(simulationData, timeStep, numSteps);
+			}
+		}
 	}
 
 	void createPlaneXZ(const GLfloat &WIDTH, const GLfloat &HEIGHT)
@@ -341,6 +383,36 @@ public:
 		}
 	}
 
+	void update()
+	{
+		if (animation) {
+
+			animation->update();
+			// Update the vertex array of the mesh from the animation step data
+			for (int i = 0; i < numVertices; ++i) {
+				vertices[i * 8] = animation->getAnimationStepData()[i * 3]; // x-pos
+				vertices[(i * 8) + 1] = animation->getAnimationStepData()[(i * 3) + 1]; // y-pos
+				vertices[(i * 8) + 2] = animation->getAnimationStepData()[(i * 3) + 2]; // z-pos
+			}
+
+			this->updateVertexBufferData();
+		}
+	}
+
+	void startAnimation()
+	{
+		if (animation) {
+			animation->startAnimation();
+		}
+	}
+
+	void stopAnimation()
+	{
+		if (animation) {
+			animation->stopAnimation();
+		}
+	}
+
 private:
 
 	bool meshIsEmpty;
@@ -354,6 +426,8 @@ private:
 	int stride; // Number of elements per row in the vertex array
 	int numTriangles; // Number of triangels of the mesh
 	int numVertices; // Number of vertices of the mesh
+
+	Animation* animation;
 
 	void generateBuffersAndVertexArrayObject()
 	{

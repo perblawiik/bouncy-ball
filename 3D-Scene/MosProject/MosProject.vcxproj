@@ -142,6 +142,7 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Animation.h" />
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Shader.h" />
