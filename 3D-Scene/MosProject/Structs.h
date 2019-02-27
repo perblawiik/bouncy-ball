@@ -22,6 +22,7 @@ struct Settings
 	GLint NUM_POINTS;
 	GLint DIM;
 	GLint NUM_STEPS;
+	GLint NUM_SEGS;
 };
 
 // Struct with all constant values for the simulation

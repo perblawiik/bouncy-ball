@@ -137,14 +137,14 @@ int main()
 	settings.WEIGHT = 1.0f; // Total weight of the system
 	settings.TIME_DURATION = 10.0f; // Specifies how long the simulation should be (given in seconds)
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
+	settings.NUM_SEGS = 16; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
 	
-	
 	// Create a sphere mesh (for the softbody)
-	int numHorizontalSegments = 16 ; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	Mesh sphere;
-	sphere.createSphere(numHorizontalSegments, settings.RADIUS);
+	sphere.createSphere(settings.NUM_SEGS, settings.RADIUS);
 	
+	/*
 	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
 	// Set the mesh of our softbody to the sphere created earlier
@@ -152,52 +152,12 @@ int main()
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
 
-
-
-	/**** Normal generation test ****/
-	/*
-	Matrix test = bouncyBall.X;
-	GLfloat totVect[] = {
-		0.0f, 0.0f, 0.0f
-	};
-	int segs = numHorizontalSegments * 2;
-
-	std::cout << test(1, 1) << " " << test(1, 2) << " " << test(1, 3) << std::endl;
-	for (int i = 1; i <= segs; ++i) {
-
-		totVect[0] += test(i + 1, 1); // x
-		totVect[1] += test(i + 1, 2); // y
-		totVect[2] += test(i + 1, 3); // z
-	}
-
-	totVect[0] = (totVect[0] / (float)segs) - test(1, 1);
-	totVect[1] = (totVect[1] / (float)segs) - test(1, 2);
-	totVect[2] = (totVect[2] / (float)segs) - test(1, 3);
-
-	std::cout << totVect[0] << " " << totVect[1] << " " << totVect[2] << std::endl;
-
-	//calculate dot product between old and new normal
-	GLfloat scalarProduct = totVect[0] * 0.0f + totVect[1] * (-1.0f) + totVect[2] * 0.0f;
-	std::cout << "Scalar product: " << scalarProduct << std::endl;
-
-	if (scalarProduct < 0.0f) {
-		totVect[0] *= -1.0f;
-		totVect[1] *= -1.0f;
-		totVect[2] *= -1.0f;
-	}
-
-	std::cout << totVect[0] << " " << totVect[1] << " " << totVect[2] << std::endl;
-
-	*/
-	/********************************/
-
-
-
-	/*
+	
 	// A matrix to store all simulation cycles in
-	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
+	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*6);
 	// Compute the entire simulation with specified number of steps
 	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
+	
 	// Save simulation data to a textfile with given name as parameter
 	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
 	*/
@@ -260,7 +220,6 @@ int main()
 		// Update color uniform
 		mainShader.setFloat3(colorLocationID, color);
 
-		
 		// Place animation 0
 		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		// Update with new model view matrix
@@ -301,7 +260,6 @@ int main()
 		ball.update(); // Update animation
 		ball.render(); // Draw
 		
-
 		/*
 		// Place sphere infront of the camera
 		MATRIX4::translate(MV, 0.0f, 0.0f, -50.0f);
@@ -352,8 +310,16 @@ void createSimulation(GLFWwindow* window, SoftBody &softBody, Matrix &PARTICLE_P
 		softBody.updateSimulationModel(settings);
 
 		// Store the calculated step as a row in a matrix
-		for (int j = 0; j < settings.NUM_POINTS*settings.DIM; ++j) {
-			PARTICLE_POSITION_DATA(i, j + 1) = softBody.getParticlePositionArray()[j];
+		for (int j = 0; j < settings.NUM_POINTS; ++j) {
+			// Position Coordinates
+			PARTICLE_POSITION_DATA(i, (j * 6) + 1) = softBody.getParticlePositionArray()[j * 3];
+			PARTICLE_POSITION_DATA(i, (j * 6) + 2) = softBody.getParticlePositionArray()[j * 3 + 1];
+			PARTICLE_POSITION_DATA(i, (j * 6) + 3) = softBody.getParticlePositionArray()[j * 3 + 2];
+
+			// Normals
+			PARTICLE_POSITION_DATA(i, (j * 6) + 4) = softBody.getParticleNormalArray()[j * 3];
+			PARTICLE_POSITION_DATA(i, (j * 6) + 5) = softBody.getParticleNormalArray()[j * 3 + 1];
+			PARTICLE_POSITION_DATA(i, (j * 6) + 6) = softBody.getParticleNormalArray()[j * 3 + 2];
 		}
 
 		// Compute the percentage of completion
@@ -381,9 +347,14 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 
 	// Update the vertex array of the mesh from the simulated position data
 	for (int i = 0; i < settings.NUM_POINTS; ++i) {
-		vertexArray[i * 8] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 1);
-		vertexArray[(i * 8) + 1] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 2);
-		vertexArray[(i * 8) + 2] = PARTICLE_POSITION_DATA(stepCounter, (i * 3) + 3);
+		// Position coordinates
+		vertexArray[i * 8] = PARTICLE_POSITION_DATA(stepCounter, (i * 6) + 1);
+		vertexArray[(i * 8) + 1] = PARTICLE_POSITION_DATA(stepCounter, (i * 6) + 2);
+		vertexArray[(i * 8) + 2] = PARTICLE_POSITION_DATA(stepCounter, (i * 6) + 3);
+		// Normals
+		vertexArray[(i * 8) + 3] = PARTICLE_POSITION_DATA(stepCounter, (i * 6) + 4);
+		vertexArray[(i * 8) + 4] = PARTICLE_POSITION_DATA(stepCounter, (i * 6) + 5);
+		vertexArray[(i * 8) + 5] = PARTICLE_POSITION_DATA(stepCounter, (i * 6) + 6);
 	}
 
 	// Update vertex buffer with new vertex array
@@ -416,9 +387,9 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 
 		// Create a string with time step (h), number of columns and number of rows of the simulation data matrix
 		std::string simulationInfo = (
-			std::to_string(simulationSettings.h) + "\n"
-			+ std::to_string(DATA.numRows()) + "\n"
-			+ std::to_string(DATA.numColumns()) + "\n"
+			std::to_string(simulationSettings.h) + "\n" +
+			std::to_string(DATA.numRows()) + "\n" +
+			std::to_string(DATA.numColumns()) + "\n"
 		);
 		// Add simulation information at the top of the file
 		std::copy(begin(simulationInfo), end(simulationInfo), out_it_char);
@@ -428,7 +399,6 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		// Copy simulation data to the animation sequence file
 		std::copy(animationSequence, animationSequence + DATA.size(), float_out_it);
 		outFile.close();
-
 
 		/** Save Mesh Data **/
 		filePath = ("Simulations//" + simulationName + ".mesh");
@@ -440,8 +410,8 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 
 		// Create a string containing vertex and triangle info
 		std::string numVerticesAndTriangles = (
-			std::to_string(numVertices) + "\n" 
-			+ std::to_string(numTriangles) + "\n"
+			std::to_string(numVertices) + "\n" +
+			std::to_string(numTriangles) + "\n"
 		);
 		// Add vertex and triangle info at the top of the file
 		std::copy(begin(numVerticesAndTriangles), end(numVerticesAndTriangles), out_it_char);

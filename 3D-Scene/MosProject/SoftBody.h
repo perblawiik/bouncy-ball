@@ -17,7 +17,7 @@ public:
 
 	// Default constructor
 	SoftBody ()
-		: mesh(nullptr), m(0.0f), X(Matrix()), I(Matrix()), V(Matrix()), Vp(Matrix()), Fk(Matrix()), Fkp(Matrix())
+		: mesh(nullptr), m(0.0f), X(Matrix()), I(Matrix()), V(Matrix()), Vp(Matrix()), Fk(Matrix()), Fkp(Matrix()), normals(Matrix())
 	{ }
 
 	~SoftBody()
@@ -37,6 +37,9 @@ public:
 
 		// Create a matrix containing the position coordinates of the mesh vertices
 		this->createParticlePositionMatrix(s);
+
+		// Create a matrix to store all the normals for each particle
+		this->normals = X; // The normals are identical to the initial vertices
 
 		// Generate an index table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
 		this->createBondIndexMatrix(s, bondRegionRadius);
@@ -126,6 +129,9 @@ public:
 		Fk = Fk + (Fkp * s.h);
 		X = X + (V * s.h);
 
+		// Update the normals to fit the new particle positions
+		this->updateNormals(s);
+
 		// Set velocity to zero if particle hits the ground
 		for (int j = 1; j <= s.NUM_POINTS; ++j) {
 
@@ -136,6 +142,7 @@ public:
 			}
 		}
 	}
+
 
 	void updatePositions()
 	{
@@ -151,6 +158,11 @@ public:
 	GLfloat* getParticlePositionArray()
 	{
 		return this->X.getValues();
+	}
+
+	GLfloat* getParticleNormalArray()
+	{
+		return this->normals.getValues();
 	}
 
 	// Return mesh vertex array used with opengl
@@ -187,6 +199,7 @@ private:
 	Matrix Vp; // The accelerations of each particle
 	Matrix Fk; // The spring force for the spring bonds
 	Matrix Fkp; // The derivative of Fk
+	Matrix normals; // The normals for each particle
 
 	void createParticlePositionMatrix(Settings &s)
 	{
@@ -195,14 +208,12 @@ private:
 		int stride = mesh->getStride();
 
 		// Particle position coordinates (x, y, z) per particle
-		Matrix positions(s.NUM_POINTS, s.DIM);
+		this->X = Matrix(s.NUM_POINTS, s.DIM);
 		for (int i = 0; i < s.NUM_POINTS; ++i) {
-			positions[i * s.DIM] = vertices[i * stride];
-			positions[i * s.DIM + 1] = vertices[i *  stride + 1];
-			positions[i * s.DIM + 2] = vertices[i *  stride + 2];
+			X[i * s.DIM] = vertices[i * stride];
+			X[i * s.DIM + 1] = vertices[i *  stride + 1];
+			X[i * s.DIM + 2] = vertices[i *  stride + 2];
 		}
-		// Store the positions as a member of the class
-		this->X = positions;
 
 		// Deactivate pointer
 		vertices = nullptr;
@@ -257,6 +268,118 @@ private:
 			// Store the bond indices as a member of the class
 			this->I = bondIndices;
 		}
+	}
+
+	void updateNormals(const Settings &s)
+	{
+		// Mean position coordinates
+		GLfloat Mx = 0.0f, My = 0.0f, Mz = 0.0f;
+
+		// Compute normals for the particles connected to the bottom vertex
+		this->computeBottomNormals(s.NUM_SEGS, Mx, My, Mz);
+
+		// Compute normals for the middle part
+		this->computeMiddleNormals(s.NUM_SEGS, Mx, My, Mz);
+		
+	}
+
+	void computeBottomNormals(const int &H_SEGS, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	{
+		int V_SEGS = H_SEGS * 2;
+		// 1. The bottom vertex normal is calculated first by using the mean point
+		//    of all connected vertices.
+		for (int i = 1; i <= V_SEGS; ++i) {
+			Mx += X(i + 1, 1); // x-coordinate
+			My += X(i + 1, 2); // y-coordinate
+			Mz += X(i + 1, 3); // z-coordinate
+		}
+		Mx /= (float)V_SEGS;
+		My /= (float)V_SEGS;
+		Mz /= (float)V_SEGS;
+
+		// Vector A (vector between the mean point and one of the connected vertices)
+		GLfloat Ax = Mx - X(2, 1);
+		GLfloat Ay = My - X(2, 2);
+		GLfloat Az = Mz - X(2, 3);
+		// Vector B (vector between the mean point and other one of the connected vertices)
+		GLfloat Bx = Mx - X(3, 1);
+		GLfloat By = My - X(3, 2);
+		GLfloat Bz = Mz - X(3, 3);
+
+		// Calculate the cross product (B x A) to get the normal
+		normals(1, 1) = (By * Az) - (Bz * Ay); // x-coordinate
+		normals(1, 2) = -((Bx * Az) - (Bz * Ax)); // y-coordinate
+		normals(1, 3) = (Bx * Ay) - (By * Ax); // z-coordinate
+
+		// 2. The normals for all vertices connected to the bottom vertex is calculated 
+		//    by using the mean point from the 4-neighbours.
+		int n = 1;
+		for (int i = 2; i <= V_SEGS + 1; ++i) {
+
+			int forward = i + 1;
+			int right = i + V_SEGS;
+			int back = i + V_SEGS - n;
+
+			// Compute the mean point
+			Mx = (X(1, 1) + X(forward, 1) + X(right, 1) + X(back, 1)) / 4.0f;
+			My = (X(1, 2) + X(forward, 2) + X(right, 2) + X(back, 2)) / 4.0f;
+			Mz = (X(1, 3) + X(forward, 3) + X(right, 3) + X(back, 3)) / 4.0f;
+			n = V_SEGS + 1;
+
+			// Vector A
+			GLfloat Ax = Mx - X(right, 1);
+			GLfloat Ay = My - X(right, 2);
+			GLfloat Az = Mz - X(right, 3);
+			// Vector B
+			GLfloat Bx = Mx - X(forward, 1);
+			GLfloat By = My - X(forward, 2);
+			GLfloat Bz = Mz - X(forward, 3);
+
+			// Calculate the cross product (A x B) to get the normal
+			normals(i, 1) = (By * Az) - (Bz * Ay);
+			normals(i, 2) = -((Bx * Az) - (Bz * Ax));
+			normals(i, 3) = (Bx * Ay) - (By * Ax);
+		}
+	}
+
+	void computeMiddleNormals(const int &H_SEGS, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	{
+		int V_SEGS = H_SEGS * 2;
+
+		int n = 1;
+		for (int i = V_SEGS; i < H_SEGS - 3; ++i) {
+
+			int left = i - V_SEGS;
+			int forward = i + 1;
+			int right = i + V_SEGS;
+			int back = i + V_SEGS - n;
+
+			// Compute the mean point
+			Mx = (X(1, 1) + X(forward, 1) + X(right, 1) + X(back, 1)) / 4.0f;
+			My = (X(1, 2) + X(forward, 2) + X(right, 2) + X(back, 2)) / 4.0f;
+			Mz = (X(1, 3) + X(forward, 3) + X(right, 3) + X(back, 3)) / 4.0f;
+			n = V_SEGS + 1;
+
+			// Vector A
+			GLfloat Ax = Mx - X(right, 1);
+			GLfloat Ay = My - X(right, 2);
+			GLfloat Az = Mz - X(right, 3);
+			// Vector B
+			GLfloat Bx = Mx - X(forward, 1);
+			GLfloat By = My - X(forward, 2);
+			GLfloat Bz = Mz - X(forward, 3);
+
+			// Calculate the cross product (A x B) to get the normal
+			normals(i, 1) = (By * Az) - (Bz * Ay);
+			normals(i, 2) = -((Bx * Az) - (Bz * Ax));
+			normals(i, 3) = (Bx * Ay) - (By * Ax);
+		}
+
+	}
+
+	void computeTopNormals(const int &segs, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	{
+
 	}
 };
 
