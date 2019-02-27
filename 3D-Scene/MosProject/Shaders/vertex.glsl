@@ -6,6 +6,8 @@ layout (location = 2) in vec2 TextCoordinates;
 uniform float time;
 uniform mat4 P; // Projection Matrix
 uniform mat4 MV; // Model View Matrix
+uniform mat4 CV; // Camera View Matrix
+uniform vec3 surfaceColor;
 
 out vec3 shadedColor;
 
@@ -22,12 +24,13 @@ vec3 Is = vec3(1.0, 1.0, 1.0); // the specular illumination color
 void main()
 {
 	// Final transformation ( Perspective multiplied with the model view )
-    mat4 T = P * MV;
+    mat4 T = P * CV * MV;
 
-    // To avoid translation of the normals use only 3x3 from our 4x4 transformation matrix
+	vec3 viewDirection = normalize(mat3(CV)*viewDirection);
     vec3 interpolatedNormal = normalize(mat3(MV)*Normal);
+    vec3 lightDirection = normalize(vec3(0.0, 1.0, 1.0));
 
-    vec3 lightDirection = normalize(vec3(1.0, 0.0, 1.0));
+	kd = surfaceColor;
 
     // Reflection direction
     vec3 R = normalize(2.0* dot(interpolatedNormal,lightDirection)*interpolatedNormal - lightDirection); // Could also have used the function reflect ()

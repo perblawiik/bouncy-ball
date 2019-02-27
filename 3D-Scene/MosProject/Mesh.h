@@ -6,8 +6,9 @@
 #include <math.h>
 #include <iostream>
 #include <fstream>
-#include <iterator>
 #include <string>
+#include <vector>
+#include <algorithm>
 
 #include "Animation.h"
 
@@ -16,48 +17,8 @@ class Mesh
 public:
 
 	Mesh()
-		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8), animation(nullptr)
+		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8), animationID(-1)
 	{ }
-
-	// Copy constructor
-	Mesh(const Mesh &m)
-		: meshIsEmpty(m.meshIsEmpty), 
-		VAO(m.VAO), VBO(m.VBO), EBO(m.EBO), 
-		vertices(new GLfloat[m.numVertices * m.stride]), indices(new GLuint[m.numTriangles * 3]), 
-		numVertices(m.numVertices), numTriangles(m.numTriangles), stride(m.stride),
-		animation(nullptr)
-	{
-		// Copy vertex array
-		for (int i = 0; i < (numVertices * stride); ++i) {
-			vertices[i] = m.vertices[i];
-		}
-
-		// Copy index array
-		for (int i = 0; i < numTriangles * 3; ++i) {
-			indices[i] = m.indices[i];
-		}
-	}
-
-	// Assignment operator
-	Mesh &operator=(const Mesh &m)
-	{
-		// Create a local copy
-		Mesh copy(m);
-
-		// Swap member variables
-		std::swap(this->meshIsEmpty, copy.meshIsEmpty);
-		std::swap(this->VAO, copy.VAO);
-		std::swap(this->VBO, copy.VBO);
-		std::swap(this->EBO, copy.EBO);
-		std::swap(this->vertices, copy.vertices);
-		std::swap(this->indices, copy.indices);
-		std::swap(this->numVertices, copy.numVertices);
-		std::swap(this->numTriangles, copy.numTriangles);
-		std::swap(this->stride, copy.stride);
-
-		// Return this instance to allow cascading
-		return *this;
-	}
 
 	~Mesh()
 	{
@@ -66,7 +27,10 @@ public:
 
 	void loadMeshData(const std::string &fileName)
 	{
+		// Clean up any previous mesh data
+		this->clean();
 		meshIsEmpty = false;
+
 		// Input File Stream
 		std::ifstream inFile;
 		if (inFile) {
@@ -120,46 +84,46 @@ public:
 
 	void addAnimation(const std::string &fileName)
 	{
-		if (!animation) {
+		// Input File Stream
+		std::ifstream inFile;
+		if (inFile) {
+			// Temporary string to store each read line
+			std::string line;
+			std::string filePath = ("Simulations//Saves//" + fileName + ".sim");
 
-			// Input File Stream
-			std::ifstream inFile;
-			if (inFile) {
-				// Temporary string to store each read line
-				std::string line;
-				std::string filePath = ("Simulations//Saves//" + fileName + ".sim");
+			// Open file for reading
+			inFile.open(filePath, std::ifstream::in);
 
-				// Open file for reading
-				inFile.open(filePath, std::ifstream::in);
+			// Get simulation time step
+			std::getline(inFile, line);
+			float timeStep = std::stof(line);
+			// Get number of steps in the simulation
+			std::getline(inFile, line);
+			int numSteps = std::stoi(line);
+			// Get the size each vertex array
+			std::getline(inFile, line);
+			int numColumns = std::stoi(line);
 
-				// Get simulation time step
-				std::getline(inFile, line);
-				float timeStep = std::stof(line);
-				// Get number of steps in the simulation
-				std::getline(inFile, line);
-				int numSteps = std::stoi(line);
-				// Get the size each vertex array
-				std::getline(inFile, line);
-				int numColumns = std::stoi(line);
+			// Allocate memory for the data set
+			Matrix* simulationData = new Matrix(numSteps, numColumns);
+				
+			int counter = 0;
+			while (std::getline(inFile, line)) {
 
-				// Allocate memory for the data set
-				Matrix* simulationData = new Matrix(numSteps, numColumns);
-
-				int counter = 0;
-				while (std::getline(inFile, line)) {
-
-					(*simulationData)[counter] = std::stof(line);
-					++counter;
-				}
-				inFile.close();
-
-				this->animation = new Animation(simulationData, timeStep, numSteps);
+				(*simulationData)[counter] = std::stof(line);
+				++counter;
 			}
+			inFile.close();
+
+			this->animations.push_back(new Animation(simulationData, timeStep, numSteps));
+			++animationID;
 		}
 	}
 
 	void createPlaneXZ(const GLfloat &WIDTH, const GLfloat &HEIGHT)
 	{
+		// Clean up any previous mesh data
+		this->clean();
 		meshIsEmpty = false;
 
 		const GLfloat vertexData[] = {
@@ -204,9 +168,11 @@ public:
 	// Generates a sphere mesh with a specified number of horizontal segments and radius as input parameters.
 	void createSphere(const int segments, const float &radius)
 	{
+		// Clean up any previous mesh data
+		this->clean();
 		meshIsEmpty = false;
-		int numHorizontalSegments = segments;
 
+		int numHorizontalSegments = segments;
 		// Minium amount of horizontal segments is 2
 		if (numHorizontalSegments < 2) {
 			numHorizontalSegments = 2;
@@ -272,7 +238,6 @@ public:
 		for (int i = 0; i < numVerticalSegments; ++i) {
 
 			indices[++index] = 0;
-
 			if ((i + 2) <= numVerticalSegments) {
 				indices[++index] = i + 2;
 			}
@@ -309,16 +274,15 @@ public:
 		for (int i = 0; i < numVerticalSegments; ++i) {
 
 			indices[++index] = lastVertexIndex;
-
 			if ((lastVertexIndex - 2 - i) >= lastVertexIndex - numVerticalSegments) {
 				indices[++index] = lastVertexIndex - 2 - i;
 			}
 			else {
 				indices[++index] = lastVertexIndex - numVerticalSegments - 1;
 			}
-
 			indices[++index] = lastVertexIndex - 1 - i;
 		}
+		indices[(numTriangles * 3) - 2] = (lastVertexIndex - 1);
 
 		// Generate ID's for buffers and vertex array to use in the shader
 		this->generateBuffersAndVertexArrayObject();
@@ -385,31 +349,33 @@ public:
 
 	void update()
 	{
-		if (animation) {
+		if (!animations.empty()) {
 
-			animation->update();
+			animations[animationID]->update();
 			// Update the vertex array of the mesh from the animation step data
 			for (int i = 0; i < numVertices; ++i) {
-				vertices[i * 8] = animation->getAnimationStepData()[i * 3]; // x-pos
-				vertices[(i * 8) + 1] = animation->getAnimationStepData()[(i * 3) + 1]; // y-pos
-				vertices[(i * 8) + 2] = animation->getAnimationStepData()[(i * 3) + 2]; // z-pos
+				vertices[i * 8] = animations[animationID]->getAnimationStepData()[i * 3]; // x-pos
+				vertices[(i * 8) + 1] = animations[animationID]->getAnimationStepData()[(i * 3) + 1]; // y-pos
+				vertices[(i * 8) + 2] = animations[animationID]->getAnimationStepData()[(i * 3) + 2]; // z-pos
 			}
 
 			this->updateVertexBufferData();
 		}
 	}
 
-	void startAnimation()
+	void startAnimation(const int ID)
 	{
-		if (animation) {
-			animation->startAnimation();
+		if (!animations.empty()) {
+			selectAnimation(ID);
+			animations[ID]->startAnimation();
 		}
 	}
 
-	void stopAnimation()
+	void stopAnimation(const int ID)
 	{
-		if (animation) {
-			animation->stopAnimation();
+		if (!animations.empty()) {
+			selectAnimation(ID);
+			animations[ID]->stopAnimation();
 		}
 	}
 
@@ -427,7 +393,21 @@ private:
 	int numTriangles; // Number of triangels of the mesh
 	int numVertices; // Number of vertices of the mesh
 
-	Animation* animation;
+	std::vector<Animation*> animations;
+
+	int animationID;
+
+
+	void selectAnimation(const unsigned int ID)
+	{
+		// Check if ID exists
+		if (ID >= 0 && ID < animations.size()) {
+			animationID = ID;
+		}
+		else {
+			std::cout << "Warning! Mesh::Select Animation::Animation ID not found!" << std::endl;
+		}
+	}
 
 	void generateBuffersAndVertexArrayObject()
 	{
@@ -508,6 +488,18 @@ private:
 
 		this->numTriangles = 0;
 		this->numVertices = 0;
+
+		if (!animations.empty()) {
+			std::for_each(animations.begin(), animations.end(), this->deallocateAnimations);
+			animations.clear();
+			animationID = -1;
+		}
+	}
+
+	static void deallocateAnimations(Animation* a)
+	{
+		delete a;
+		a = nullptr;
 	}
 };
 

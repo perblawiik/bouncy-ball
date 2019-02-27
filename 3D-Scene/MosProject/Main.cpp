@@ -7,6 +7,8 @@
 #include "SoftBody.h"
 #include "Structs.h"
 #include "Mesh.h"
+#include "Camera.h"
+#include "CameraController.h"
 
 #include <iostream>
 #include <fstream>
@@ -23,10 +25,11 @@ const GLfloat PI = GLOBAL_CONSTANTS::PI;
 
 /** FUNCTION DECLARATIONS **/
 // A callback function on the window that gets called each time the window is resized
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-
+void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 // Checks if a key is currently being pressed
-void processInput(GLFWwindow *window);
+void processInput(GLFWwindow* window, Camera &cam, const GLfloat &dt);
+// Get IDs for the uniform locations in shader (prints warning message to console if not found)
+void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color);
 
 // Load simulation with specified number of steps and store all particle positions in a single matrix.
 void createSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITION_DATA, Settings &settings);
@@ -35,10 +38,6 @@ void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &setti
 // Save simulation data to a text file
 void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings, const std::string &simulationName);
 
-// Matrix functions
-void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar);
-void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z);
-void mat4Identity(GLfloat M[]);
 
 int main() 
 {
@@ -68,8 +67,8 @@ int main()
 
 	glfwMakeContextCurrent(window);
 	// Tell GLFW we want to use our resize callback function on every window resize
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwSetWindowAspectRatio(window, 4, 3);
+	glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+	glfwSetWindowAspectRatio(window, 16, 9);
 
 	// Initialize GLAD (load all function pointers for OpenGL)
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -78,22 +77,54 @@ int main()
 		return -1;
 	}
 
-	// Modelview matrix
-	GLfloat MV[16] = {0};
-	// Position the object in front of the camera
-	mat4Translate(MV, 0.0f, 0.0f, -50.0f);
+	// Set window to show black background
+	glClear(GL_COLOR_BUFFER_BIT);
+	glfwSwapBuffers(window);
+	
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Wireframe mode
+	glEnable(GL_CULL_FACE); // Hide the back face of the triangles
+	glClearColor(0.25f, 0.25f, 0.25f, 1.0f); // Set the color for every clear call
+	glEnable(GL_DEPTH_TEST); // Enable depth so that objects closest to the camera view is visible
 
-	// Perspective matrix
-	GLfloat P[16] = {0};
-	mat4Perspective(P, PI / 3, 1.0f, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
-
-	// Shader instance for our bouncy ball
+	// Shader instance for our main shader
 	Shader mainShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 	// Activate shader
 	mainShader.use();
-	// Insert Projection Matrix
-	mainShader.setFloatMat4("P", P);
 
+	// Location IDs for shader uniforms
+	GLint modelViewMatrixLocationID; // Model View Matrix
+	GLint cameraViewMatrixLocationID; // Camera View Matrix
+	GLint perspectiveMatrixLocationID; // Perspective Matrix
+	GLint colorLocationID; // Surface color for objects
+	
+	// Get uniform location IDs from the shader (prints warning message to console if not found)
+	getUniformLocationIDs(mainShader, modelViewMatrixLocationID, cameraViewMatrixLocationID, perspectiveMatrixLocationID, colorLocationID);
+
+	// Surface color for objects
+	GLfloat color[3] = { 
+		1.0, 0.5, 0.0
+	};
+
+	// Modelview matrix
+	GLfloat MV[16] = { 0 };
+	// Position the object in front of the camera
+	MATRIX4::identity(MV);
+
+	// Perspective matrix
+	GLfloat P[16] = { 0 };
+	// Field of view is set to PI/3 (60 degrees)
+	MATRIX4::perspective(P, PI / 3, (GLfloat)WINDOW_WIDTH/(GLfloat)WINDOW_HEIGHT, 0.1f, 1000.0f);
+	// Insert Projection Matrix
+	mainShader.setFloatMat4(perspectiveMatrixLocationID, P);
+
+	// Create a camera for the scene
+	Camera camera(&mainShader, cameraViewMatrixLocationID);
+	// Back the camera away from the origin 
+	camera.setPosition(0.0f, 0.0f, 100.0f); // (x, y, z)
+
+	// Create a camera controller
+	CameraController controller(&camera, window);
+	controller.setMouseSensitivity(20.0f);
 	
 	// Settings for the simulation model of the softbody
 	Settings settings = {};
@@ -108,7 +139,7 @@ int main()
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
 	
-	/*
+	
 	// Create a sphere mesh (for the softbody)
 	int numHorizontalSegments = 16 ; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	Mesh sphere;
@@ -120,7 +151,49 @@ int main()
 	bouncyBall.setMesh(&sphere);
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
-	
+
+
+
+	/**** Normal generation test ****/
+	/*
+	Matrix test = bouncyBall.X;
+	GLfloat totVect[] = {
+		0.0f, 0.0f, 0.0f
+	};
+	int segs = numHorizontalSegments * 2;
+
+	std::cout << test(1, 1) << " " << test(1, 2) << " " << test(1, 3) << std::endl;
+	for (int i = 1; i <= segs; ++i) {
+
+		totVect[0] += test(i + 1, 1); // x
+		totVect[1] += test(i + 1, 2); // y
+		totVect[2] += test(i + 1, 3); // z
+	}
+
+	totVect[0] = (totVect[0] / (float)segs) - test(1, 1);
+	totVect[1] = (totVect[1] / (float)segs) - test(1, 2);
+	totVect[2] = (totVect[2] / (float)segs) - test(1, 3);
+
+	std::cout << totVect[0] << " " << totVect[1] << " " << totVect[2] << std::endl;
+
+	//calculate dot product between old and new normal
+	GLfloat scalarProduct = totVect[0] * 0.0f + totVect[1] * (-1.0f) + totVect[2] * 0.0f;
+	std::cout << "Scalar product: " << scalarProduct << std::endl;
+
+	if (scalarProduct < 0.0f) {
+		totVect[0] *= -1.0f;
+		totVect[1] *= -1.0f;
+		totVect[2] *= -1.0f;
+	}
+
+	std::cout << totVect[0] << " " << totVect[1] << " " << totVect[2] << std::endl;
+
+	*/
+	/********************************/
+
+
+
+	/*
 	// A matrix to store all simulation cycles in
 	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*settings.DIM);
 	// Compute the entire simulation with specified number of steps
@@ -132,41 +205,14 @@ int main()
 	// Create a XZ-plane as floor
 	Mesh floor;
 	floor.createPlaneXZ(200.0f, 200.0f);
-
 	
-	Mesh ball_01;
-	ball_01.loadMeshData("BouncyBall_back_left");
-	ball_01.addAnimation("BouncyBall_back_left");
-	ball_01.startAnimation();
-
-	
-	Mesh ball_02;
-	ball_02.loadMeshData("BouncyBall_back_right");
-	ball_02.addAnimation("BouncyBall_back_right");
-	ball_02.startAnimation();
-
-	
-	Mesh ball_03;
-	ball_03.loadMeshData("BouncyBall_front_left");
-	ball_03.addAnimation("BouncyBall_front_left");
-	ball_03.startAnimation();
-
-	Mesh ball_04;
-	ball_04.loadMeshData("BouncyBall_straight_up");
-	ball_04.addAnimation("BouncyBall_straight_up");
-	ball_04.startAnimation();
-	
-	Mesh ball_05;
-	ball_05.loadMeshData("BouncyBall_front_right");
-	ball_05.addAnimation("BouncyBall_front_right");
-	ball_05.startAnimation();
-
-
-	// Wireframe mode
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	// Hide the back face of the triangles
-	glEnable(GL_CULL_FACE);
-	glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
+	Mesh ball;
+	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
+	ball.addAnimation("BouncyBall_back_left"); // ID: 0
+	ball.addAnimation("BouncyBall_back_right"); // ID: 1
+	ball.addAnimation("BouncyBall_front_left"); // ID: 2
+	ball.addAnimation("BouncyBall_straight_up"); // ID: 3
+	ball.addAnimation("BouncyBall_front_right"); // ID: 4
 
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
@@ -180,70 +226,87 @@ int main()
 	{
 		// Update current time
 		GLfloat startTime = (GLfloat)glfwGetTime();
-		// Read input
-		processInput(window);
 
-		// Rendering commands here
+		// Calculate time passed since last render
+		deltaTime = startTime - time;
+		// Update time
+		time = startTime;
+
+		// Read inputs
+		processInput(window, camera, deltaTime); 
+		controller.processInput(deltaTime);
+
+
+		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Activate shader
 		mainShader.use();
+
 		// Place the floor
-		mat4Translate(MV, 0.0f, -settings.RADIUS*2.0f, -100.0f);
+		MATRIX4::translate(MV, 0.0f, -settings.RADIUS*2.0f, 0.0f);
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
+		// Set surface color for the floor (dark green)
+		color[0] = 0.0f; color[1] = 0.25f; color[2] = 0.0f;
+		// Update color uniform
+		mainShader.setFloat3(colorLocationID, color);
 		// Draw floor
 		floor.render();
 
+
+		// Set the surface color for the spheres (orange)
+		color[0] = 1.0f; color[1] = 0.5f; color[2] = 0.0f;
+		// Update color uniform
+		mainShader.setFloat3(colorLocationID, color);
+
 		
-		// Place ball 01
-		mat4Translate(MV, -settings.RADIUS*2.0f, 0.0f, -100.0f - (settings.RADIUS*2.0f));
+		// Place animation 0
+		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);
-		// Update
-		ball_01.update();
-		// Draw
-		ball_01.render();
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
+		ball.startAnimation(0);
+		ball.update(); // Update animation
+		ball.render(); // Draw
 
-		// Place ball 02
-		mat4Translate(MV, settings.RADIUS*2.0f, 0.0f, -100.0f - (settings.RADIUS*2.0f));
+		// Place animation 1
+		MATRIX4::translate(MV, settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);
-		// Update
-		ball_02.update();
-		// Draw
-		ball_02.render();
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
+		ball.startAnimation(1);
+		ball.update(); // Update animation
+		ball.render(); // Draw
 
-		// Place ball 03
-		mat4Translate(MV, -settings.RADIUS*2.0f, 0.0f, -100.0f);
+		// Place animation 2
+		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, 0.0f);
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);
-		// Update
-		ball_03.update();
-		// Draw
-		ball_03.render();
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
+		ball.startAnimation(2);
+		ball.update(); // Update animation
+		ball.render(); // Draw
 
-		// Place ball 04
-		mat4Translate(MV, 0.0f, 0.0f, -100.0f);
+		// Place animation 3
+		MATRIX4::translate(MV, 0.0f, 0.0f, 0.0f);
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);
-		// Update
-		ball_04.update();
-		// Draw
-		ball_04.render();
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
+		ball.startAnimation(3);
+		ball.update(); // Update animation
+		ball.render(); // Draw
 
-		// Place ball 05
-		mat4Translate(MV, settings.RADIUS*2.0f, 0.0f, -100.0f);
+		// Place animation 4
+		MATRIX4::translate(MV, settings.RADIUS*2.0f, 0.0f, 0.0f);
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);
-		ball_05.update();
-		ball_05.render();
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
+		ball.startAnimation(4);
+		ball.update(); // Update animation
+		ball.render(); // Draw
+		
 
 		/*
 		// Place sphere infront of the camera
-		mat4Translate(MV, 0.0f, 0.0f, -50.0f);
+		MATRIX4::translate(MV, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix
-		mainShader.setFloatMat4("MV", MV);	
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
 		// Render (draw) the simulation one step at the time
 		renderSimulationStep(
 			stepCounter, // Keeps count of which simulation step to draw
@@ -259,16 +322,12 @@ int main()
 		glfwPollEvents();
 
 		// Update current time
-		GLfloat currentTime = (GLfloat)glfwGetTime();
-		// Calculate time passed since last render
-		deltaTime = currentTime - time;
-		// Update time
-		time = currentTime;
+		GLfloat endTime = (GLfloat)glfwGetTime();
 
 		// Hold each frame for a specified number of seconds (its based on step size of the simulation right now)
-		while ((currentTime - startTime) < (settings.h)) {
+		while ((endTime - startTime) < (settings.h)) {
 
-			currentTime = (GLfloat)glfwGetTime();
+			endTime = (GLfloat)glfwGetTime();
 		}
 	}
 
@@ -352,99 +411,89 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		std::ostream_iterator<char> out_it_char(outFile, ""); // Iterator for handling characters
 
 		/** Save Simulation Data **/
-		std::string animationPath = ("Simulations//" + simulationName + ".sim");
-		outFile.open(animationPath, std::ostream::out);
-		if (outFile.is_open()) {
-			// Create a string with time step (h), number of columns and number of rows of the simulation data matrix
-			std::string simulationInfo = (
-				std::to_string(simulationSettings.h) + "\n"
-				+ std::to_string(DATA.numRows()) + "\n"
-				+ std::to_string(DATA.numColumns()) + "\n"
-			);
-			// Add simulation information at the top of the file
-			std::copy(begin(simulationInfo), end(simulationInfo), out_it_char);
+		std::string filePath = ("Simulations//" + simulationName + ".sim");
+		outFile.open(filePath, std::ostream::out);
 
-			// Create pointer to the simulation data
-			float* animationSequence = DATA.getValues();
-			// Copy simulation data to the animation sequence file
-			std::copy(animationSequence, animationSequence + DATA.size(), float_out_it);
-		}
-		else {
-			std::cout << "WARNING! Save Simulation Sequence::Unable to open animation file" << std::endl;
-		}
+		// Create a string with time step (h), number of columns and number of rows of the simulation data matrix
+		std::string simulationInfo = (
+			std::to_string(simulationSettings.h) + "\n"
+			+ std::to_string(DATA.numRows()) + "\n"
+			+ std::to_string(DATA.numColumns()) + "\n"
+		);
+		// Add simulation information at the top of the file
+		std::copy(begin(simulationInfo), end(simulationInfo), out_it_char);
+
+		// Create pointer to the simulation data
+		float* animationSequence = DATA.getValues();
+		// Copy simulation data to the animation sequence file
+		std::copy(animationSequence, animationSequence + DATA.size(), float_out_it);
 		outFile.close();
 
+
 		/** Save Mesh Data **/
-		std::string meshPath = ("Simulations//" + simulationName + ".mesh");
-		outFile.open(meshPath, std::ofstream::out);
-		if (outFile.is_open()) {
+		filePath = ("Simulations//" + simulationName + ".mesh");
+		outFile.open(filePath, std::ofstream::out);
 
-			int numVertices = sb.getNumMeshVertices();
-			int numTriangles = sb.getNumMeshTriangles();
+		// Get vertex and triangle info
+		int numVertices = sb.getNumMeshVertices();
+		int numTriangles = sb.getNumMeshTriangles();
 
-			// Create a string containing vertex and triangle information
-			std::string numVerticesAndTriangles = (
-				std::to_string(numVertices) + "\n" 
-				+ std::to_string(numTriangles) + "\n"
-			);
-			// Add number of vertices and triangles
-			std::copy(begin(numVerticesAndTriangles), end(numVerticesAndTriangles), out_it_char);
+		// Create a string containing vertex and triangle info
+		std::string numVerticesAndTriangles = (
+			std::to_string(numVertices) + "\n" 
+			+ std::to_string(numTriangles) + "\n"
+		);
+		// Add vertex and triangle info at the top of the file
+		std::copy(begin(numVerticesAndTriangles), end(numVerticesAndTriangles), out_it_char);
 
-			// Create a pointer to the vertex array
-			float* vertices = sb.getMeshVertexArray();
-			// Copy the vertex array to the mesh data file
-			std::copy(vertices, vertices + (numVertices * 8), float_out_it);
-			// Create a pointer to the index array
-			GLuint* indices = sb.getMeshIndexArray();
-			// Copy the index array to the mesh data file
-			std::copy(indices, indices + (numTriangles * 3), float_out_it);
-		}
-		else {
-			std::cout << "WARNING! Save Simulation Sequence::Unable to open mesh file" << std::endl;
-		}
+		// Create a pointer to the vertex array
+		float* vertices = sb.getMeshVertexArray();
+		// Copy the vertex array to the mesh data file
+		std::copy(vertices, vertices + (numVertices * 8), float_out_it);
+		// Create a pointer to the index array
+		GLuint* indices = sb.getMeshIndexArray();
+		// Copy the index array to the mesh data file
+		std::copy(indices, indices + (numTriangles * 3), float_out_it);
 		outFile.close();
 	}
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
 	glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow* window)
+void processInput(GLFWwindow* window, Camera &cam, const GLfloat &dt)
 {
 	// If user press the escape key, close GLFW
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
+	}
 }
 
-// M is the matrix we want to create (an output argument )
-// vertFov is the vertical field of view (in the y direction )
-// aspect is the aspect ratio of the viewport ( width / height )
-// zNear is the distance to the near clip plane ( znear > 0)
-// zFar is the distance to the far clip plane ( zfar > znear )
-void mat4Perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar) {
+void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color)
+{
+	// Model view matrix
+	MV = glGetUniformLocation(shader.ID, "MV"); 
+	if (MV == -1) { // If the variable is not found , -1 is returned
+		std::cout << " Unable to locate variable 'MV' in shader !" << std::endl;
+	}
 
-	GLfloat f = cos(vertFov / 2) / sin(vertFov / 2);
+	// Camera view matrix
+	CV = glGetUniformLocation(shader.ID, "CV");
+	if (MV == -1) {
+		std::cout << " Unable to locate variable 'CV' in shader !" << std::endl;
+	}
 
-	M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;                              M[12] = 0.0f;
-	M[1] = 0.0f;       M[5] = f;    M[9] = 0.0f;                              M[13] = 0.0f;
-	M[2] = 0.0f;       M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
-	M[3] = 0.0f;       M[7] = 0.0f; M[11] = -1.0f;                            M[15] = 0.0f;
-}
+	// Perspective matrix
+	P = glGetUniformLocation(shader.ID, "P");
+	if (P == -1) { 
+		std::cout << " Unable to locate variable 'P' in shader !" << std::endl;
+	}
 
-void mat4Translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z) {
-
-	M[0] = 1.0f; M[4] = 0.0f; M[8] = 0.0f; M[12] = x;
-	M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f; M[13] = y;
-	M[2] = 0.0f; M[6] = 0.0f; M[10] = 1.0f; M[14] = z;
-	M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f; M[15] = 1.0f;
-}
-
-void mat4Identity(GLfloat M[]) {
-
-	M[0] = 1.0f; M[4] = 0.0f; M[8] = 0.0f;  M[12] = 0.0f;
-	M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f;  M[13] = 0.0f;
-	M[2] = 0.0f; M[6] = 0.0f; M[10] = 1.0f;  M[14] = 0.0f;
-	M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f;  M[15] = 1.0f;
+	// Surface color
+	color = glGetUniformLocation(shader.ID, "surfaceColor");
+	if (P == -1) {
+		std::cout << " Unable to locate variable 'P' in shader !" << std::endl;
+	}
 }

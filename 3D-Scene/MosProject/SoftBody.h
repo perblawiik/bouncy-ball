@@ -15,26 +15,19 @@ class SoftBody
 {
 public:
 
+	// Default constructor
 	SoftBody ()
-		: mesh(nullptr)
-	{ 
-		m = Matrix();
-		X = Matrix();
-		I = Matrix();
-		V = Matrix();
-		Vp = Matrix();
-		Fk = Matrix();
-		Fkp = Matrix();
-	}
+		: mesh(nullptr), m(0.0f), X(Matrix()), I(Matrix()), V(Matrix()), Vp(Matrix()), Fk(Matrix()), Fkp(Matrix())
+	{ }
 
 	~SoftBody()
 	{
 		mesh = nullptr;
 	}
 
-	void setMesh(Mesh *newMesh)
+	void setMesh(Mesh *m)
 	{
-		mesh = newMesh;
+		mesh = m;
 	}
 
 	void setupSimulationModel(Settings &s, const float &bondRegionRadius)
@@ -48,13 +41,8 @@ public:
 		// Generate an index table for the spring bonds between particles (Ex. bond between p1 and p2 get connection [1, 2])
 		this->createBondIndexMatrix(s, bondRegionRadius);
 
-		//Masses per particle
-		Matrix masses(s.NUM_POINTS, 1); // Create Nx1 matrix
-		for (int i = 0; i < masses.size(); ++i) {
-			masses[i] = s.WEIGHT / (float)s.NUM_POINTS; // The whole mass is distributed equally
-		}
-		// Store the masses as a member of the class
-		this->m = masses;
+		// Set the mass for each particle (total weight divided by number of particles)
+		this->m = s.WEIGHT / (float)s.NUM_POINTS;
 
 		// Starting velocity [Vx Vy]/ per particle
 		Matrix velocities(s.NUM_POINTS, s.DIM); // All set to zero by default
@@ -84,9 +72,6 @@ public:
 
 	void updateSimulationModel(const Settings &s)
 	{
-		// Used to set Vp to zero each cycle
-		Matrix zeros(s.NUM_POINTS, s.DIM);
-
 		// Dummy vectors (1xDIM matrix)
 		Matrix vec1(1, s.DIM);
 		Matrix vec2(1, s.DIM);
@@ -95,6 +80,7 @@ public:
 		Matrix diff(1, s.DIM);
 
 		// Set to zero so the components from each connected spring can be += and added separately
+		Matrix zeros(s.NUM_POINTS, s.DIM);
 		Vp = zeros;
 		for (int n = 1; n <= s.NUM_BONDS; ++n) // Loop through the springs
 		{
@@ -121,11 +107,9 @@ public:
 			// both pulled towards eachother or drawn away from eachother.
 			Vp.copyRow(index1, vec1); // Copy acceleration of point 1 to vec1
 			Vp.copyRow(index2, vec2); // Copy acceleration of point 2 to vec2
-			float m1 = m(index1, 1); // Mass of point 1
-			float m2 = m(index2, 1); // Mass of point 2
 			float F = Fk(n, 1); // Spring force
-			Vp.replaceRow(index1, vec1 - (diff * (1.0f / m1) * (s.b*dV + F)));
-			Vp.replaceRow(index2, vec2 + (diff * (1.0f / m2) * (s.b*dV + F)));
+			Vp.replaceRow(index1, vec1 - (diff * (1.0f / m) * (s.b*dV + F)));
+			Vp.replaceRow(index2, vec2 + (diff * (1.0f / m) * (s.b*dV + F)));
 
 			// The derivative for Fk
 			Fkp(n, 1) = s.k * dV;
@@ -190,18 +174,18 @@ public:
 	{
 		return (mesh->getNumTriangles());
 	}
-
+	Matrix X; // The coordinates (x, y, z) for each particle
 private:
 	// Mesh for the softbody
 	Mesh* mesh;
 
 	// Simulation variables
-	Matrix m; // The masses for each particle in the simulation
-	Matrix X; // The coordinates (x, y, z) for each particle in the simulation
-	Matrix I; // The spring bond indices for the particles in the simulation
-	Matrix V; // The velocity of each particle in the simulation
-	Matrix Vp; // The accelerations of each particle in the simulation
-	Matrix Fk; // The spring force for the spring bonds in the simulation
+	GLfloat m; // The mass for each particle
+	
+	Matrix I; // The spring bond indices for the particles
+	Matrix V; // The velocity of each particle
+	Matrix Vp; // The accelerations of each particle
+	Matrix Fk; // The spring force for the spring bonds
 	Matrix Fkp; // The derivative of Fk
 
 	void createParticlePositionMatrix(Settings &s)
