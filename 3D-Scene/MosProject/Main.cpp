@@ -144,7 +144,7 @@ int main()
 	Mesh sphere;
 	sphere.createSphere(settings.NUM_SEGS, settings.RADIUS);
 	
-	/*
+	
 	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
 	// Set the mesh of our softbody to the sphere created earlier
@@ -152,20 +152,19 @@ int main()
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
 
-	
 	// A matrix to store all simulation cycles in
 	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*6);
 	// Compute the entire simulation with specified number of steps
 	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
-	
 	// Save simulation data to a textfile with given name as parameter
 	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
-	*/
+	
 
 	// Create a XZ-plane as floor
 	Mesh floor;
 	floor.createPlaneXZ(200.0f, 200.0f);
 	
+	/*
 	Mesh ball;
 	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
 	ball.addAnimation("BouncyBall_back_left"); // ID: 0
@@ -173,7 +172,7 @@ int main()
 	ball.addAnimation("BouncyBall_front_left"); // ID: 2
 	ball.addAnimation("BouncyBall_straight_up"); // ID: 3
 	ball.addAnimation("BouncyBall_front_right"); // ID: 4
-
+	*/
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
 	GLfloat deltaTime = 0.0f;
@@ -220,6 +219,7 @@ int main()
 		// Update color uniform
 		mainShader.setFloat3(colorLocationID, color);
 
+		/*
 		// Place animation 0
 		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		// Update with new model view matrix
@@ -259,8 +259,8 @@ int main()
 		ball.startAnimation(4);
 		ball.update(); // Update animation
 		ball.render(); // Draw
+		*/
 		
-		/*
 		// Place sphere infront of the camera
 		MATRIX4::translate(MV, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix
@@ -273,7 +273,7 @@ int main()
 			PARTICLE_POSITION_DATA, // A matrix that stores all simulation steps
 			bouncyBall // SoftBody simulation model (contains all information about the simulation)
 		);
-		*/
+		
 
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
