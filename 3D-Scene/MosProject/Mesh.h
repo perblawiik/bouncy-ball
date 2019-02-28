@@ -354,9 +354,14 @@ public:
 			animations[animationID]->update();
 			// Update the vertex array of the mesh from the animation step data
 			for (int i = 0; i < numVertices; ++i) {
-				vertices[i * 8] = animations[animationID]->getAnimationStepData()[i * 3]; // x-pos
-				vertices[(i * 8) + 1] = animations[animationID]->getAnimationStepData()[(i * 3) + 1]; // y-pos
-				vertices[(i * 8) + 2] = animations[animationID]->getAnimationStepData()[(i * 3) + 2]; // z-pos
+				// Vertex coordinates
+				vertices[i * 8] = animations[animationID]->getAnimationStepData()[i * 6];
+				vertices[(i * 8) + 1] = animations[animationID]->getAnimationStepData()[(i * 6) + 1];
+				vertices[(i * 8) + 2] = animations[animationID]->getAnimationStepData()[(i * 6) + 2];
+				// Normal
+				vertices[(i * 8) + 3] = animations[animationID]->getAnimationStepData()[(i * 6) + 3];
+				vertices[(i * 8) + 4] = animations[animationID]->getAnimationStepData()[(i * 6) + 4];
+				vertices[(i * 8) + 5] = animations[animationID]->getAnimationStepData()[(i * 6) + 5];
 			}
 
 			this->updateVertexBufferData();

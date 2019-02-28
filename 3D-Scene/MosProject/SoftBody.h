@@ -49,10 +49,10 @@ public:
 
 		// Starting velocity [Vx Vy]/ per particle
 		Matrix velocities(s.NUM_POINTS, s.DIM); // All set to zero by default
-		for (int i = 1; i < s.NUM_POINTS/2; ++i) {
-			velocities(i, 1) = 0.0f; // x
-			velocities(i, 2) = 30.0f; // y
-			velocities(i, 3) = -30.0f; // z
+		for (int i = 1; i < s.NUM_POINTS; ++i) {
+			velocities(i, 1) = -5.0f; // x
+			velocities(i, 2) = 5.0f; // y
+			velocities(i, 3) = 20.0f; // z
 		}
 		// Store the velocities as a member of the class
 		this->V = velocities;
@@ -272,128 +272,50 @@ private:
 
 	void updateNormals(const Settings &s)
 	{
-		// Mean position coordinates
-		GLfloat Mx = 0.0f, My = 0.0f, Mz = 0.0f;
-
 		// Compute normals for the particles connected to the bottom vertex
-		this->computeBottomCapNormals(s.NUM_SEGS, Mx, My, Mz);
+		this->computeBottomCapNormals(s.NUM_SEGS);
 
 		// Compute normals for the middle part
-		this->computeMiddleNormals(s.NUM_SEGS, Mx, My, Mz);
-		
+		this->computeMiddleNormals(s.NUM_SEGS);
+
+		// Compute normals for the particles connected to the top vertex
+		this->computeTopCapNormals(s.NUM_SEGS);
 	}
 
-	void computeBottomCapNormals(const int &H_SEGS, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	void computeBottomCapNormals(const int &H_SEGS)
 	{
-		this->computeBottomNormal(H_SEGS, Mx, My, Mz);
-
+		// The normal for the bottom vertex demands a special case
+		this->computeBottomNormal(H_SEGS);
 		int V_SEGS = H_SEGS * 2;
-		GLfloat Fx, Fy, Fz, Lx, Ly, Lz, Bx, By, Bz, Rx, Ry, Rz;
-		// 2. The normals for all vertices connected to the bottom vertex is calculated 
-		//    by using the mean point from the 4-neighbours.
+
+		// All vertices have the bottom vertex to their right side
+		int right = 1;
 		int n = 1;
 		int i = 2;
 		for ( ; i < V_SEGS + 1; ++i) {
 
-			Mx = 0.0f; My = 0.0f; Mz = 0.0f;
 			int forward = i + 1;
 			int left = i + V_SEGS;
-			int right = 1;
 			int back = i + V_SEGS - n;
 			n = V_SEGS + 1;
 
-			// Forward vector
-			Fx = X(forward, 1) - X(i, 1);
-			Fy = X(forward, 2) - X(i, 2);
-			Fz = X(forward, 3) - X(i, 3);
-			// Left vector
-			Lx = X(left, 1) - X(i, 1);
-			Ly = X(left, 2) - X(i, 2);
-			Lz = X(left, 3) - X(i, 3);
-			// Backwards vector
-			Bx = X(back, 1) - X(i, 1);
-			By = X(back, 2) - X(i, 2);
-			Bz = X(back, 3) - X(i, 3);
-			// Right vector
-			Rx = X(right, 1) - X(i, 1);
-			Ry = X(right, 2) - X(i, 2);
-			Rz = X(right, 3) - X(i, 3);
-
-			// Calculate the cross product (Forward x Left) to get the normal
-			Mx += (Fy * Lz) - (Fz * Ly);
-			My += -((Fx * Lz) - (Fz * Lx));
-			Mz += (Fx * Ly) - (Fy * Lx);
-			// Calculate the cross product (Left x Backwards) to get the normal
-			Mx += (Ly * Bz) - (Lz * By);
-			My += -((Lx * Bz) - (Lz * Bx));
-			Mz += (Lx * By) - (Ly * Bx);
-			// Calculate the cross product (Backwards x Right) to get the normal
-			Mx += (By * Rz) - (Bz * Ry);
-			My += -((Bx * Rz) - (Bz * Rx));
-			Mz += (Bx * Ry) - (By * Rx);
-			// Calculate the cross product (Right x Forward) to get the normal
-			Mx += (Ry * Fz) - (Rz * Fy);
-			My += -((Rx * Fz) - (Rz * Fx));
-			Mz += (Rx * Fy) - (Ry * Fx);
-
-			// The final normal is the sum of all face normals
-			normals(i, 1) = Mx;
-			normals(i, 2) = My;
-			normals(i, 3) = Mz;
+			// Compute neighbouring face normals and use the sum as the final normal
+			this->computeFourNeighbourNormal(forward, left, back, right, i);
 		} 
 
-		Mx = 0.0f; My = 0.0f; Mz = 0.0f;
-		int forward = i - V_SEGS;
+		int forward = 2;
 		int left = i + V_SEGS;
-		int right = 1;
 		int back = i + V_SEGS - n;
 
-		// Forward vector
-		Fx = X(forward, 1) - X(i, 1);
-		Fy = X(forward, 2) - X(i, 2);
-		Fz = X(forward, 3) - X(i, 3);
-		// Left vector
-		Lx = X(left, 1) - X(i, 1);
-		Ly = X(left, 2) - X(i, 2);
-		Lz = X(left, 3) - X(i, 3);
-		// Backwards vector
-		Bx = X(back, 1) - X(i, 1);
-		By = X(back, 2) - X(i, 2);
-		Bz = X(back, 3) - X(i, 3);
-		// Right vector
-		Rx = X(right, 1) - X(i, 1);
-		Ry = X(right, 2) - X(i, 2);
-		Rz = X(right, 3) - X(i, 3);
-
-		// Calculate the cross product (Forward x Left) to get the normal
-		Mx += (Fy * Lz) - (Fz * Ly);
-		My += -((Fx * Lz) - (Fz * Lx));
-		Mz += (Fx * Ly) - (Fy * Lx);
-		// Calculate the cross product (Left x Backwards) to get the normal
-		Mx += (Ly * Bz) - (Lz * By);
-		My += -((Lx * Bz) - (Lz * Bx));
-		Mz += (Lx * By) - (Ly * Bx);
-		// Calculate the cross product (Backwards x Right) to get the normal
-		Mx += (By * Rz) - (Bz * Ry);
-		My += -((Bx * Rz) - (Bz * Rx));
-		Mz += (Bx * Ry) - (By * Rx);
-		// Calculate the cross product (Right x Forward) to get the normal
-		Mx += (Ry * Fz) - (Rz * Fy);
-		My += -((Rx * Fz) - (Rz * Fx));
-		Mz += (Rx * Fy) - (Ry * Fx);
-
-		// The final normal is the sum of all face normals
-		normals(i, 1) = Mx;
-		normals(i, 2) = My;
-		normals(i, 3) = Mz;
+		// Compute neighbouring face normals and use the sum as the final normal
+		this->computeFourNeighbourNormal(forward, left, back, right, i);
 	}
 
-	void computeBottomNormal(const int &H_SEGS, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	// The bottom vertex normal is calculated by using the sum of all connected face normals
+	void computeBottomNormal(const int &H_SEGS)
 	{
 		int V_SEGS = H_SEGS * 2;
-		// 1. The bottom vertex normal is calculated first by using the sum of all face normals
-		//    of all connected vertices.
-		Mx = My = Mz = 0.0f;
+		GLfloat Mx = 0.0f; GLfloat My = 0.0f; GLfloat Mz = 0.0f;
 		GLfloat Ax, Ay, Az, Bx, By, Bz;
 		int i = 1;
 		for (; i < V_SEGS; ++i) {
@@ -433,115 +355,159 @@ private:
 		normals(1, 3) = Mz; // z-coordinate
 	}
 
-	void computeMiddleNormals(const int &H_SEGS, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	void computeMiddleNormals(const int &H_SEGS)
 	{
 		int V_SEGS = H_SEGS * 2;
-		GLfloat Fx, Fy, Fz, Lx, Ly, Lz, Bx, By, Bz, Rx, Ry, Rz;
 
 		for (int j = 1; j <= H_SEGS - 3; ++j) {
 
 			int n = 1;
-			int i = (V_SEGS+2)*j;
-			for (; i < V_SEGS + 1; ++i) {
+			int i = (V_SEGS * j) + 2;
+			for (int k = 1; k < V_SEGS; ++i, ++k) {
 
-				Mx = 0.0f; My = 0.0f; Mz = 0.0f;
 				int forward = i + 1;
 				int left = i + V_SEGS;
-				int right = i - V_SEGS;
 				int back = i + V_SEGS - n;
+				int right = i - V_SEGS;
 				n = V_SEGS + 1;
 
-				// Forward vector
-				Fx = X(forward, 1) - X(i, 1);
-				Fy = X(forward, 2) - X(i, 2);
-				Fz = X(forward, 3) - X(i, 3);
-				// Left vector
-				Lx = X(left, 1) - X(i, 1);
-				Ly = X(left, 2) - X(i, 2);
-				Lz = X(left, 3) - X(i, 3);
-				// Backwards vector
-				Bx = X(back, 1) - X(i, 1);
-				By = X(back, 2) - X(i, 2);
-				Bz = X(back, 3) - X(i, 3);
-				// Right vector
-				Rx = X(right, 1) - X(i, 1);
-				Ry = X(right, 2) - X(i, 2);
-				Rz = X(right, 3) - X(i, 3);
-
-				// Calculate the cross product (Forward x Left) to get the normal
-				Mx += (Fy * Lz) - (Fz * Ly);
-				My += -((Fx * Lz) - (Fz * Lx));
-				Mz += (Fx * Ly) - (Fy * Lx);
-				// Calculate the cross product (Left x Backwards) to get the normal
-				Mx += (Ly * Bz) - (Lz * By);
-				My += -((Lx * Bz) - (Lz * Bx));
-				Mz += (Lx * By) - (Ly * Bx);
-				// Calculate the cross product (Backwards x Right) to get the normal
-				Mx += (By * Rz) - (Bz * Ry);
-				My += -((Bx * Rz) - (Bz * Rx));
-				Mz += (Bx * Ry) - (By * Rx);
-				// Calculate the cross product (Right x Forward) to get the normal
-				Mx += (Ry * Fz) - (Rz * Fy);
-				My += -((Rx * Fz) - (Rz * Fx));
-				Mz += (Rx * Fy) - (Ry * Fx);
-
-				// The final normal is the sum of all face normals
-				normals(i, 1) = Mx;
-				normals(i, 2) = My;
-				normals(i, 3) = Mz;
+				// Compute neighbouring face normals and use the sum as the final normal
+				this->computeFourNeighbourNormal(forward, left, back, right, i);
 			}
 
-			Mx = 0.0f; My = 0.0f; Mz = 0.0f;
-			int forward = i - V_SEGS;
+			int forward = (V_SEGS * j) + 2;
 			int left = i + V_SEGS;
-			int right = i - V_SEGS;;
 			int back = i + V_SEGS - n;
+			int right = i - V_SEGS;
 
-			// Forward vector
-			Fx = X(forward, 1) - X(i, 1);
-			Fy = X(forward, 2) - X(i, 2);
-			Fz = X(forward, 3) - X(i, 3);
-			// Left vector
-			Lx = X(left, 1) - X(i, 1);
-			Ly = X(left, 2) - X(i, 2);
-			Lz = X(left, 3) - X(i, 3);
-			// Backwards vector
-			Bx = X(back, 1) - X(i, 1);
-			By = X(back, 2) - X(i, 2);
-			Bz = X(back, 3) - X(i, 3);
-			// Right vector
-			Rx = X(right, 1) - X(i, 1);
-			Ry = X(right, 2) - X(i, 2);
-			Rz = X(right, 3) - X(i, 3);
-
-			// Calculate the cross product (Forward x Left) to get the normal
-			Mx += (Fy * Lz) - (Fz * Ly);
-			My += -((Fx * Lz) - (Fz * Lx));
-			Mz += (Fx * Ly) - (Fy * Lx);
-			// Calculate the cross product (Left x Backwards) to get the normal
-			Mx += (Ly * Bz) - (Lz * By);
-			My += -((Lx * Bz) - (Lz * Bx));
-			Mz += (Lx * By) - (Ly * Bx);
-			// Calculate the cross product (Backwards x Right) to get the normal
-			Mx += (By * Rz) - (Bz * Ry);
-			My += -((Bx * Rz) - (Bz * Rx));
-			Mz += (Bx * Ry) - (By * Rx);
-			// Calculate the cross product (Right x Forward) to get the normal
-			Mx += (Ry * Fz) - (Rz * Fy);
-			My += -((Rx * Fz) - (Rz * Fx));
-			Mz += (Rx * Fy) - (Ry * Fx);
-
-			// The final normal is the sum of all face normals
-			normals(i, 1) = Mx;
-			normals(i, 2) = My;
-			normals(i, 3) = Mz;
+			// Compute neighbouring face normals and use the sum as the final normal
+			this->computeFourNeighbourNormal(forward, left, back, right, i);
 		}
 
 	}
 
-	void computeTopNormals(const int &segs, GLfloat &Mx, GLfloat &My, GLfloat &Mz)
+	void computeTopCapNormals(const int &H_SEGS)
 	{
+		int V_SEGS = H_SEGS * 2;
+		int topVertexIndex = X.numRows();
+		// All vertices have the top vertex to their left side
+		int left = topVertexIndex; 
 
+		int n = 1;
+		int i = topVertexIndex - V_SEGS;
+
+		for (; i < topVertexIndex - 1; ++i) {
+
+			int forward = i + 1;
+			int right = i - V_SEGS;
+			int back = i + V_SEGS - n;
+			n = V_SEGS + 1;
+
+			// Compute neighbouring face normals and use the sum as the final normal
+			this->computeFourNeighbourNormal(forward, left, back, right, i);
+		}
+
+		int forward = topVertexIndex - V_SEGS;
+		int right = i - V_SEGS;
+		int back = i + V_SEGS - n;
+
+		// Compute neighbouring face normals and use the sum as the final normal
+		this->computeFourNeighbourNormal(forward, left, back, right, i);
+
+		// The normal for the top vertex demands a special case
+		this->computeTopNormal(H_SEGS);
+	}
+
+	void computeTopNormal(const int &H_SEGS)
+	{
+		int topVertexIndex = X.numRows();
+		int V_SEGS = H_SEGS * 2;
+		GLfloat Sx = 0.0f; GLfloat Sy = 0.0f; GLfloat Sz = 0.0f;
+		GLfloat Ax, Ay, Az, Bx, By, Bz;
+
+		int i = topVertexIndex - V_SEGS;
+		for ( ; i < topVertexIndex - 1; ++i) {
+			// Vector A (vector between the top vertex and one of the connected vertices)
+			Ax = X(i, 1) - X(topVertexIndex, 1); 
+			Ay = X(i, 2) - X(topVertexIndex, 2); 
+			Az = X(i, 3) - X(topVertexIndex, 3);
+
+			// Vector B (vector between the top vertex and other one of the connected vertices)
+			Bx = X(i + 1, 1) - X(topVertexIndex, 1); 
+			By = X(i + 1, 2) - X(topVertexIndex, 2);
+			Bz = X(i + 1, 3) - X(topVertexIndex, 3);
+
+			// Calculate the cross product (A x B) to get the face normal between vector A and B
+			Sx += (Ay * Bz) - (Az * By); 
+			Sy += -((Ax * Bz) - (Az * Bx)); 
+			Sz += (Ax * By) - (Ay * Bx);
+		}
+
+		// Vector A (vector between the top vertex and one of the connected vertices)
+		Ax = X(i, 1) - X(topVertexIndex, 1); 
+		Ay = X(i, 2) - X(topVertexIndex, 2); 
+		Az = X(i, 3) - X(topVertexIndex, 3); 
+
+		// Vector B (vector between the top vertex and other one of the connected vertices)
+		Bx = X(topVertexIndex - V_SEGS, 1) - X(topVertexIndex, 1); 
+		By = X(topVertexIndex - V_SEGS, 2) - X(topVertexIndex, 2); 
+		Bz = X(topVertexIndex - V_SEGS, 3) - X(topVertexIndex, 3);
+
+		// Calculate the cross product (B x A) to get the normal
+		Sx += (Ay * Bz) - (Az * By); 
+		Sy += -((Ax * Bz) - (Az * Bx)); 
+		Sz += (Ax * By) - (Ay * Bx); 
+
+		// The top normal is the sum of all face normals
+		normals(topVertexIndex, 1) = Sx; // x-coordinate
+		normals(topVertexIndex, 2) = Sy; // y-coordinate
+		normals(topVertexIndex, 3) = Sz; // z-coordinate
+	}
+
+	void computeFourNeighbourNormal (const int forward, const int left, const int back, const int right, const int index)
+	{
+		// Sum vector (sum of all normals)
+		GLfloat Sx = 0.0f; 
+		GLfloat Sy = 0.0f; 
+		GLfloat Sz = 0.0f;
+		// Forward vector
+		GLfloat Fx = X(forward, 1) - X(index, 1);
+		GLfloat Fy = X(forward, 2) - X(index, 2);
+		GLfloat Fz = X(forward, 3) - X(index, 3);
+		// Left vector
+		GLfloat Lx = X(left, 1) - X(index, 1);
+		GLfloat Ly = X(left, 2) - X(index, 2);
+		GLfloat Lz = X(left, 3) - X(index, 3);
+		// Backwards vector
+		GLfloat Bx = X(back, 1) - X(index, 1);
+		GLfloat By = X(back, 2) - X(index, 2);
+		GLfloat Bz = X(back, 3) - X(index, 3);
+		// Right vector
+		GLfloat Rx = X(right, 1) - X(index, 1);
+		GLfloat Ry = X(right, 2) - X(index, 2);
+		GLfloat Rz = X(right, 3) - X(index, 3);
+
+		// Calculate the cross product (Forward x Left) to get the normal
+		Sx += (Fy * Lz) - (Fz * Ly);
+		Sy += -((Fx * Lz) - (Fz * Lx));
+		Sz += (Fx * Ly) - (Fy * Lx);
+		// Calculate the cross product (Left x Backwards) to get the normal
+		Sx += (Ly * Bz) - (Lz * By);
+		Sy += -((Lx * Bz) - (Lz * Bx));
+		Sz += (Lx * By) - (Ly * Bx);
+		// Calculate the cross product (Backwards x Right) to get the normal
+		Sx += (By * Rz) - (Bz * Ry);
+		Sy += -((Bx * Rz) - (Bz * Rx));
+		Sz += (Bx * Ry) - (By * Rx);
+		// Calculate the cross product (Right x Forward) to get the normal
+		Sx += (Ry * Fz) - (Rz * Fy);
+		Sy += -((Rx * Fz) - (Rz * Fx));
+		Sz += (Rx * Fy) - (Ry * Fx);
+
+		// The final normal is the sum of all face normals
+		normals(index, 1) = Sx;
+		normals(index, 2) = Sy;
+		normals(index, 3) = Sz;
 	}
 };
 

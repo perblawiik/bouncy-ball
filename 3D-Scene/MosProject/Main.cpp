@@ -139,11 +139,11 @@ int main()
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	settings.NUM_SEGS = 16; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
-	
+
+	/*
 	// Create a sphere mesh (for the softbody)
 	Mesh sphere;
 	sphere.createSphere(settings.NUM_SEGS, settings.RADIUS);
-	
 	
 	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
@@ -158,13 +158,12 @@ int main()
 	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
 	// Save simulation data to a textfile with given name as parameter
 	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
-	
+	*/
 
 	// Create a XZ-plane as floor
 	Mesh floor;
-	floor.createPlaneXZ(200.0f, 200.0f);
+	floor.createPlaneXZ(400.0f, 400.0f);
 	
-	/*
 	Mesh ball;
 	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
 	ball.addAnimation("BouncyBall_back_left"); // ID: 0
@@ -172,7 +171,7 @@ int main()
 	ball.addAnimation("BouncyBall_front_left"); // ID: 2
 	ball.addAnimation("BouncyBall_straight_up"); // ID: 3
 	ball.addAnimation("BouncyBall_front_right"); // ID: 4
-	*/
+
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
 	GLfloat deltaTime = 0.0f;
@@ -195,72 +194,71 @@ int main()
 		processInput(window, camera, deltaTime); 
 		controller.processInput(deltaTime);
 
-
 		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Activate shader
 		mainShader.use();
 
-		// Place the floor
-		MATRIX4::translate(MV, 0.0f, -settings.RADIUS*2.0f, 0.0f);
-		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
-		// Set surface color for the floor (dark green)
-		color[0] = 0.0f; color[1] = 0.25f; color[2] = 0.0f;
-		// Update color uniform
-		mainShader.setFloat3(colorLocationID, color);
-		// Draw floor
-		floor.render();
+	
+		// FLOOR
+		MATRIX4::translate(MV, 0.0f, -settings.RADIUS*2.0f, 0.0f); // Place the floor
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
+		color[0] = 0.0f; color[1] = 0.25f; color[2] = 0.0f; // Set color to Green
+		mainShader.setFloat3(colorLocationID, color); // Update color uniform
+		floor.render(); // Draw
 
 
-		// Set the surface color for the spheres (orange)
-		color[0] = 1.0f; color[1] = 0.5f; color[2] = 0.0f;
-		// Update color uniform
-		mainShader.setFloat3(colorLocationID, color);
+		// ANIMATION 0
+		color[0] = 1.0f; color[1] = 0.5f; color[2] = 0.0f; // Set color to Orange
+		mainShader.setFloat3(colorLocationID, color); // Update color uniform
+		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f)); // Position the sphere
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
+		ball.startAnimation(0); // Use animation id 0
+		ball.update(); // Update animation
+		ball.render(); // Draw
+		
+
+		// ANIMATION 1
+		color[0] = 1.0f; color[1] = 0.25f; color[2] = 0.25f; // Set color to Red
+		mainShader.setFloat3(colorLocationID, color); // Update color uniform
+		MATRIX4::translate(MV, settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f)); // Position the sphere
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
+		ball.startAnimation(1); // Use animation id 1
+		ball.update(); // Update animation
+		ball.render(); // Draw
+
+
+		// ANIMATION 2
+		color[0] = 0.0f; color[1] = 1.0f; color[2] = 1.0f; // Set color to Cyan
+		mainShader.setFloat3(colorLocationID, color); // Update color uniform
+		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, 0.0f); // Position the sphere
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
+		ball.startAnimation(2); // Use animation id 2
+		ball.update(); // Update animation
+		ball.render(); // Draw
+
+		
+		// ANIMATION 3
+		color[0] = 0.1f; color[1] = 0.1f; color[2] =0.1f; // Set color to Dark Grey
+		mainShader.setFloat3(colorLocationID, color); // Update color uniform
+		MATRIX4::translate(MV, 0.0f, 0.0f, 0.0f); // Position the sphere
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
+		ball.startAnimation(3); // Use animation id 3
+		ball.update(); // Update animation
+		ball.render(); // Draw
+
+
+		// ANIMATION 4
+		color[0] = 1.0f; color[1] = 0.0f; color[2] = 1.0f; // Set color to Magenta
+		mainShader.setFloat3(colorLocationID, color); // Update color uniform
+		MATRIX4::translate(MV, settings.RADIUS*2.0f, 0.0f, 0.0f); // Position the sphere
+		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
+		ball.startAnimation(4); // Use animation id 4
+		ball.update(); // Update animation
+		ball.render(); // Draw
 
 		/*
-		// Place animation 0
-		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
-		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
-		ball.startAnimation(0);
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-		// Place animation 1
-		MATRIX4::translate(MV, settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
-		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
-		ball.startAnimation(1);
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-		// Place animation 2
-		MATRIX4::translate(MV, -settings.RADIUS*2.0f, 0.0f, 0.0f);
-		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
-		ball.startAnimation(2);
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-		// Place animation 3
-		MATRIX4::translate(MV, 0.0f, 0.0f, 0.0f);
-		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
-		ball.startAnimation(3);
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-		// Place animation 4
-		MATRIX4::translate(MV, settings.RADIUS*2.0f, 0.0f, 0.0f);
-		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, MV);
-		ball.startAnimation(4);
-		ball.update(); // Update animation
-		ball.render(); // Draw
-		*/
-		
 		// Place sphere infront of the camera
 		MATRIX4::translate(MV, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix
@@ -273,7 +271,7 @@ int main()
 			PARTICLE_POSITION_DATA, // A matrix that stores all simulation steps
 			bouncyBall // SoftBody simulation model (contains all information about the simulation)
 		);
-		
+		*/
 
 		// Swap buffers and check for keyboard input or mouse movement events
 		glfwSwapBuffers(window);
@@ -377,7 +375,7 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 	std::ofstream outFile;
 	if (outFile) {
 		// Initiate output stream iterators
-		std::ostream_iterator<float> float_out_it(outFile, "\n"); // Iterator for handling floats
+		std::ostream_iterator<GLfloat> float_out_it(outFile, "\n"); // Iterator for handling floats
 		std::ostream_iterator<GLuint> uint_out_it(outFile, "\n"); // Iterator for handling integers
 		std::ostream_iterator<char> out_it_char(outFile, ""); // Iterator for handling characters
 
@@ -423,7 +421,7 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		// Create a pointer to the index array
 		GLuint* indices = sb.getMeshIndexArray();
 		// Copy the index array to the mesh data file
-		std::copy(indices, indices + (numTriangles * 3), float_out_it);
+		std::copy(indices, indices + (numTriangles * 3), uint_out_it);
 		outFile.close();
 	}
 }

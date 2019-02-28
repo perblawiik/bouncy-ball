@@ -8,11 +8,6 @@
 class Animation
 {
 public:
-	// Default constructor
-	Animation()
-		: stepData(Matrix()), animationDataSet(nullptr), timeStep(0.0f), numSteps(0), stepCounter(0), animationIsActive(false)
-	{ }
-
 	// Constructor
 	Animation(Matrix* dataSet, const float &stepSize, const int &numSteps)
 		: stepData(Matrix(1, dataSet->numColumns())), animationDataSet(dataSet), timeStep(stepSize), numSteps(numSteps), stepCounter(1), animationIsActive(false)
