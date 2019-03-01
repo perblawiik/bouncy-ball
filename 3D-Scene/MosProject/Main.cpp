@@ -9,6 +9,7 @@
 #include "Mesh.h"
 #include "Camera.h"
 #include "CameraController.h"
+#include "Texture.h"
 
 #include <iostream>
 #include <fstream>
@@ -29,7 +30,7 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 // Checks if a key is currently being pressed
 void processInput(GLFWwindow* window, Camera &cam, const GLfloat &dt);
 // Get IDs for the uniform locations in shader (prints warning message to console if not found)
-void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color);
+void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color, GLint &cameraPos);
 
 // Load simulation with specified number of steps and store all particle positions in a single matrix.
 void createSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITION_DATA, Settings &settings);
@@ -96,13 +97,23 @@ int main()
 	GLint cameraViewMatrixLocationID; // Camera View Matrix
 	GLint perspectiveMatrixLocationID; // Perspective Matrix
 	GLint colorLocationID; // Surface color for objects
+	GLint cameraPositionLocationID;
 	
 	// Get uniform location IDs from the shader (prints warning message to console if not found)
-	getUniformLocationIDs(mainShader, modelViewMatrixLocationID, cameraViewMatrixLocationID, perspectiveMatrixLocationID, colorLocationID);
+	getUniformLocationIDs(
+		mainShader, 
+		modelViewMatrixLocationID, 
+		cameraViewMatrixLocationID, 
+		perspectiveMatrixLocationID, 
+		colorLocationID,
+		cameraPositionLocationID
+	);
+
+	GLfloat cameraPosition[3] = { 0.0f };
 
 	// Surface color for objects
 	GLfloat color[3] = { 
-		1.0, 0.5, 0.0
+		1.0f, 0.5f, 0.0f
 	};
 
 	// Modelview matrix
@@ -167,11 +178,16 @@ int main()
 	Mesh ball;
 	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
 	ball.addAnimation("BouncyBall_back_left"); // ID: 0
+	/*
 	ball.addAnimation("BouncyBall_back_right"); // ID: 1
 	ball.addAnimation("BouncyBall_front_left"); // ID: 2
 	ball.addAnimation("BouncyBall_straight_up"); // ID: 3
 	ball.addAnimation("BouncyBall_front_right"); // ID: 4
-
+	*/
+	// Load a texture
+	Texture woodenFloor("Files//Textures//wooden_floor.jpg");
+	Texture pattern("Files//Textures//tweed_pattern.jpg");
+	
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
 	GLfloat deltaTime = 0.0f;
@@ -194,21 +210,27 @@ int main()
 		processInput(window, camera, deltaTime); 
 		controller.processInput(deltaTime);
 
+
 		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Activate shader
 		mainShader.use();
 
-	
+		camera.getCameraPosition(cameraPosition);
+		mainShader.setFloat3(cameraPositionLocationID, cameraPosition);
+
+		// Use texture
+		woodenFloor.use(); 
 		// FLOOR
 		MATRIX4::translate(MV, 0.0f, -settings.RADIUS*2.0f, 0.0f); // Place the floor
 		mainShader.setFloatMat4(modelViewMatrixLocationID, MV); // Update with new model view matrix
-		color[0] = 0.0f; color[1] = 0.25f; color[2] = 0.0f; // Set color to Green
+		color[0] = 1.0f; color[1] = 1.0f; color[2] = 1.0f; // Set color to White
 		mainShader.setFloat3(colorLocationID, color); // Update color uniform
 		floor.render(); // Draw
 
-
+		// Use texture
+		pattern.use(); 
 		// ANIMATION 0
 		color[0] = 1.0f; color[1] = 0.5f; color[2] = 0.0f; // Set color to Orange
 		mainShader.setFloat3(colorLocationID, color); // Update color uniform
@@ -218,7 +240,7 @@ int main()
 		ball.update(); // Update animation
 		ball.render(); // Draw
 		
-
+		/*
 		// ANIMATION 1
 		color[0] = 1.0f; color[1] = 0.25f; color[2] = 0.25f; // Set color to Red
 		mainShader.setFloat3(colorLocationID, color); // Update color uniform
@@ -257,7 +279,8 @@ int main()
 		ball.startAnimation(4); // Use animation id 4
 		ball.update(); // Update animation
 		ball.render(); // Draw
-
+		*/
+	
 		/*
 		// Place sphere infront of the camera
 		MATRIX4::translate(MV, 0.0f, 0.0f, -50.0f);
@@ -439,7 +462,7 @@ void processInput(GLFWwindow* window, Camera &cam, const GLfloat &dt)
 	}
 }
 
-void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color)
+void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color, GLint &cameraPos)
 {
 	// Model view matrix
 	MV = glGetUniformLocation(shader.ID, "MV"); 
@@ -461,7 +484,13 @@ void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint
 
 	// Surface color
 	color = glGetUniformLocation(shader.ID, "surfaceColor");
-	if (P == -1) {
-		std::cout << " Unable to locate variable 'P' in shader !" << std::endl;
+	if (color == -1) {
+		std::cout << " Unable to locate variable 'color' in shader !" << std::endl;
+	}
+
+	// Camera position
+	cameraPos = glGetUniformLocation(shader.ID, "cameraPosition");
+	if (cameraPos == -1) {
+		std::cout << " Unable to locate variable 'cameraPosition' in shader !" << std::endl;
 	}
 }

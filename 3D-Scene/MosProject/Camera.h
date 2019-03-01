@@ -90,6 +90,13 @@ public:
 		this->shader->setFloatMat4(matrixUniformLocationID, transform->matrix4);
 	}
 
+	void getCameraPosition(GLfloat out[])
+	{
+		out[0] = -transform->position[0];
+		out[1] = -transform->position[1];
+		out[2] = -transform->position[2];
+	}
+
 private:
 	Transform* transform;
 	Shader* shader;

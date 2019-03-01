@@ -128,10 +128,10 @@ public:
 
 		const GLfloat vertexData[] = {
 			// Position Coordinates                    // Normals          // Texture coordinates
-			-(WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 1.0f, // Upper left
-			 (WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, // Upper right
-			 (WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // Lower right
-			-(WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 0.0f  // Lower left
+			-(WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // Upper left
+			 (WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 0.0f, // Upper right
+			 (WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, // Lower right
+			-(WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 1.0f  // Lower left
 		};
 
 		const GLuint indexData[] = {
