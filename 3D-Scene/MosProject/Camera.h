@@ -4,6 +4,7 @@
 #define CAMERA_H
 
 #include <glad/glad.h>
+#include <vector>
 
 #include "Transform.h"
 #include "Shader.h"
@@ -11,11 +12,13 @@
 class Camera
 {
 public:
-	Camera(Shader* sh, GLint uniformId)
-		: transform(new Transform()), shader(sh), matrixUniformLocationID(uniformId)
+	Camera(Shader* sh)
+		: transform(new Transform())
 	{ 
 		// When we move the camera we actually move the world. 
 		// This means that the transform matrix should be inverted.
+		shaders.push_back(sh);
+
 		transform->invert();
 		this->updateUniformMatrix();
 	}
@@ -25,7 +28,12 @@ public:
 		delete transform;
 		transform = nullptr;
 
-		shader = nullptr;
+		shaders.clear();
+	}
+
+	void addShader(Shader* sh)
+	{
+		shaders.push_back(sh);
 	}
 
 	// Set position vector
@@ -86,21 +94,20 @@ public:
 	// Update camera view matrix in the shader
 	void updateUniformMatrix()
 	{
-		this->shader->use();
-		this->shader->setFloatMat4(matrixUniformLocationID, transform->matrix4);
+		for (unsigned int i = 0; i < shaders.size(); ++i) {
+			shaders[i]->use();
+			shaders[i]->setFloatMat4("cameraView", transform->matrix4);
+		}
 	}
 
-	void getCameraPosition(GLfloat out[])
+	GLfloat* getPosition()
 	{
-		out[0] = -transform->position[0];
-		out[1] = -transform->position[1];
-		out[2] = -transform->position[2];
+		return transform->position;
 	}
 
 private:
 	Transform* transform;
-	Shader* shader;
-	GLint matrixUniformLocationID;
+	std::vector<Shader*> shaders;
 };
 
 #endif

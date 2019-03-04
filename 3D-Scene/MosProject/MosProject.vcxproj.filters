@@ -57,5 +57,7 @@
   <ItemGroup>
     <None Include="Shaders\fragment.glsl" />
     <None Include="Shaders\vertex.glsl" />
+    <None Include="Shaders\lampFrag.glsl" />
+    <None Include="Shaders\lampVert.glsl" />
   </ItemGroup>
 </Project>

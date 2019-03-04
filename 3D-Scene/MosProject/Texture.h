@@ -26,15 +26,6 @@ public:
 		// Create texture ID
 		glGenTextures(1, &ID);
 
-		// Bind texture
-		glBindTexture(GL_TEXTURE_2D, ID);
-
-		// Set the texture wrapping and filtering options for the currently bound texture
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
 		// Generate texture
 		// Arg 1. The texture target
 		// Arg 2. The mipmap level
@@ -44,8 +35,25 @@ public:
 		// Arg 7 - 8. Specify the format and datatype of the source image
 		// Arg 9. Image data
 		if (data) {
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+
+			GLenum format;
+			if (numChannels == 1)
+				format = GL_RED;
+			else if (numChannels == 3)
+				format = GL_RGB;
+			else if (numChannels == 4)
+				format = GL_RGBA;
+
+			// Bind texture
+			glBindTexture(GL_TEXTURE_2D, ID);
+			glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 			glGenerateMipmap(GL_TEXTURE_2D);
+
+			// Set the texture wrapping and filtering options for the currently bound texture
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		}
 		else {
 			std::cout << "Error when loading texture!" << std::endl;

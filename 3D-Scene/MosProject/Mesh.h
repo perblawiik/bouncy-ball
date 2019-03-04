@@ -200,27 +200,28 @@ public:
 		const GLfloat PI = GLOBAL_CONSTANTS::PI;
 		GLfloat sampleRate = PI / numHorizontalSegments; // Number of steps 
 		GLfloat theta = -PI + sampleRate; // Go from bottom to top (Y € -PI < theta < PI )
-		GLfloat phi = 0; // Begin at Z = 0 (Z € 0 < phi < 2PI )
-
+		GLfloat phi = 0.0f; // Begin at Z = 0 (Z € 0 < phi < 2PI )
+		
 		// Generate middle part vertices with normals
 		int index = 7; // Skip first 7 (the bottom vertex with normal and texture coordinates already specified)
 		for (int i = 0; i < numHorizontalSegments - 1; ++i) {
 
-			float Y = radius * cos(theta); // Y-coordinate
-			float R = radius * sin(theta); // radius
+			float Y = cos(theta); // Y-coordinate
+			float R = sin(theta); // XZ-plane
 
+			phi = 0.0f;
 			for (int j = 0; j < numVerticalSegments; ++j) {
 				// Vertex (x, y, z)
-				vertices[++index] = R * sin(phi);
-				vertices[++index] = Y;
-				vertices[++index] = R * cos(phi);
+				vertices[++index] = radius * R * sin(phi);
+				vertices[++index] = radius * Y;
+				vertices[++index] = radius * R * cos(phi);
 				// Normal (x, y, z)
 				vertices[++index] = R * sin(phi);
 				vertices[++index] = Y;
 				vertices[++index] = R * cos(phi);
 				// Texture Coordinates (s, t)
-				vertices[++index] = (float)j/numVerticalSegments;
-				vertices[++index] = 1.0f - (float)(i + 1) / numHorizontalSegments;
+				vertices[++index] = phi / (2.0f * PI);
+				vertices[++index] = 1.0f + (theta / PI);
 
 				phi += sampleRate;
 			}
@@ -229,7 +230,7 @@ public:
 
 		// Top vertex
 		vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f; // Coordinates
-		vertices[++index] = 0.0f; vertices[++index] = radius; vertices[++index] = 0.0f; // Normal
+		vertices[++index] = 0.0f; vertices[++index] = 1.0f; vertices[++index] = 0.0f; // Normal
 		vertices[++index] = 0.5f; vertices[++index] = 1.0f;
 
 		/** Generate index array */

@@ -121,9 +121,22 @@ public:
 	}
 
 	// Vec3 float
+	void setFloat3(const std::string &name, float values[])
+	{
+		glUniform3f(glGetUniformLocation(ID, name.c_str()), values[0], values[1], values[2]);
+	}
 	void setFloat3(const GLint &uniformID, float values[])
 	{
 		glUniform3f(uniformID, values[0], values[1], values[2]);
+	}
+
+	void setVec3(const std::string &name, const float &x, const float &y, const float &z)
+	{
+		glUniform3f(glGetUniformLocation(ID, name.c_str()), x, y, z);
+	}
+	void setVec3(const GLint &uniformID, const float &x, const float &y, const float &z)
+	{
+		glUniform3f(uniformID, x, y, z);
 	}
 
 	void setFloatMat4(const std::string &name, float values[]) const

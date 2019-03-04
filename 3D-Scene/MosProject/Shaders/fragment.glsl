@@ -2,33 +2,43 @@
 
 out vec4 FragColor;
 
-layout(pixel_center_integer) in vec4 gl_FragCoord;
+in vec2 TexCoords;
+in vec3 Normal;
+in vec3 FragPosition;
 
-//in vec3 shadedColor;
-in vec2 texCoords;
-
-// Light stuff
-in vec3 cameraPos;
-in vec3 reflection;
-in vec3 ambientDiffuse;
-in float isOnDarkSide;
-in vec3 worldPosition;
-
-uniform sampler2D texture;
-
-float n = 15.0; // the " shininess " parameter
-vec3 ks = vec3(1.0, 1.0, 1.0); // the specular surface reflection color
-vec3 Is = vec3(1.0, 1.0, 1.0); // the specular illumination color
+uniform sampler2D textureImage;
+uniform vec3 objectColor;
+uniform vec3 viewPosition;
+uniform vec3 lightPosition;
+uniform vec3 lightColor;
 
 void main()
 {
+	vec3 viewDirection = normalize(viewPosition - FragPosition);
+	vec3 lightDirection = normalize(lightPosition - FragPosition);
+	vec3 reflectDirection = reflect(-lightDirection, Normal); 
 
-	vec3 viewDirection = normalize(worldPosition - cameraPos);
+	// Ambient lighting
+	float ambientStrength = 0.1;
+    vec3 ambient = ambientStrength * lightColor;
 
-	float dotRV = max(dot(reflection, viewDirection), 0.0) * isOnDarkSide;
-	//if (isOnDarkSide) dotRV = 0.0;
+	// Diffuse lighting
+	float diff = max(dot(Normal, lightDirection), 0.0);
+	vec3 diffuse = (diff * lightColor);
 
-	vec3 shadedColor = ambientDiffuse + Is*ks* pow (dotRV , n);
+	// Specular lighting
+	float specularStrength = 0.5;
+	float shininess = 32;
+	float spec = pow(max(dot(viewDirection, reflectDirection), 0.0), shininess);
+	vec3 specular = specularStrength * spec * lightColor;  
 
-    FragColor = texture(texture, texCoords) * vec4 (shadedColor, 1.0);
+	// Calculate the intensity decrement
+	float dist = distance(lightPosition, FragPosition);
+	float intensity = min(80.0 / dist, 1.0);
+
+	// Phong lighting model
+	vec3 phong = (ambient + diffuse + specular) * objectColor * intensity;
+
+	// Final shaded color (texture * lighting)
+    FragColor = texture(textureImage, TexCoords) * vec4 (phong, 1.0);
 } 

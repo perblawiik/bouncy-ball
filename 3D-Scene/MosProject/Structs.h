@@ -26,7 +26,7 @@ struct Settings
 };
 
 // Struct with all constant values for the simulation
-struct GLOBAL_CONSTANTS 
+struct GLOBAL_CONSTANTS
 {
 	struct window
 	{
@@ -35,18 +35,20 @@ struct GLOBAL_CONSTANTS
 	};
 
 	static const float PI;
+	static const float EPSILON;
 };
 
 const int GLOBAL_CONSTANTS::window::WIDTH = 1280;
 const int GLOBAL_CONSTANTS::window::HEIGHT = 720;
 const float GLOBAL_CONSTANTS::PI = 3.14159265359f;
+const float GLOBAL_CONSTANTS::EPSILON = 0.000001f;
 
 
 // Transformation matrices
-struct MATRIX4 
+struct MATRIX4
 {
 	// Creates a translation matrix
-	static void translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z) 
+	static void translate(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z)
 	{
 		M[0] = 1.0f; M[4] = 0.0f; M[8] = 0.0f; M[12] = x;
 		M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f; M[13] = y;
@@ -55,7 +57,7 @@ struct MATRIX4
 	}
 
 	// Creates an identity matrix
-	static void identity(GLfloat M[]) 
+	static void identity(GLfloat M[])
 	{
 		M[0] = 1.0f; M[4] = 0.0f; M[8] = 0.0f;  M[12] = 0.0f;
 		M[1] = 0.0f; M[5] = 1.0f; M[9] = 0.0f;  M[13] = 0.0f;
@@ -64,7 +66,7 @@ struct MATRIX4
 	}
 
 	// Creates a scale matrix
-	static void scale(GLfloat M[], const GLfloat &scale) 
+	static void scale(GLfloat M[], const GLfloat &scale)
 	{
 		M[0] = scale; M[4] = 0.0f;  M[8] = 0.0f;  M[12] = 0.0f;
 		M[1] = 0.0f;  M[5] = scale; M[9] = 0.0f;  M[13] = 0.0f;
@@ -100,26 +102,27 @@ struct MATRIX4
 	}
 
 	// Inverts a given matrix and returns the matrix combination
-	static void invert(GLfloat out[], GLfloat a[]) {
+	static void invert(GLfloat out[], GLfloat const a[])
+	{
 		GLfloat a00 = a[0],
-			    a01 = a[1],
-			    a02 = a[2],
-			    a03 = a[3];
+			a01 = a[1],
+			a02 = a[2],
+			a03 = a[3];
 
 		GLfloat a10 = a[4],
-			    a11 = a[5],
-			    a12 = a[6],
-			    a13 = a[7];
+			a11 = a[5],
+			a12 = a[6],
+			a13 = a[7];
 
 		GLfloat a20 = a[8],
-			    a21 = a[9],
-			    a22 = a[10],
-			    a23 = a[11];
+			a21 = a[9],
+			a22 = a[10],
+			a23 = a[11];
 
 		GLfloat a30 = a[12],
-			    a31 = a[13],
-			    a32 = a[14],
-			    a33 = a[15];
+			a31 = a[13],
+			a32 = a[14],
+			a33 = a[15];
 
 		GLfloat b00 = a00 * a11 - a01 * a10;
 		GLfloat b01 = a00 * a12 - a02 * a10;
@@ -137,7 +140,7 @@ struct MATRIX4
 		// Calculate the determinant
 		GLfloat det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
-		if (abs(det) > 0.001f) 
+		if (abs(det) > GLOBAL_CONSTANTS::EPSILON)
 			det = 1.0f / det;
 
 		out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
@@ -163,7 +166,7 @@ struct MATRIX4
 	// aspect is the aspect ratio of the viewport ( width / height )
 	// zNear is the distance to the near clip plane ( znear > 0)
 	// zFar is the distance to the far clip plane ( zfar > znear )
-	static void perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar) 
+	static void perspective(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear, const GLfloat &zFar)
 	{
 		GLfloat f = cos(vertFov / 2) / sin(vertFov / 2);
 
@@ -171,6 +174,92 @@ struct MATRIX4
 		M[1] = 0.0f;       M[5] = f;    M[9] = 0.0f;                              M[13] = 0.0f;
 		M[2] = 0.0f;       M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
 		M[3] = 0.0f;       M[7] = 0.0f; M[11] = -1.0f;                            M[15] = 0.0f;
+	}
+
+	// Generates an orthogonal projection matrix
+	static void orthogonal(GLfloat M[], const GLfloat &left, const GLfloat &right, const GLfloat &bottom, const GLfloat &top, const GLfloat &nearPlane, const GLfloat &farPlane)
+	{
+		GLfloat lr = 1.0f / (left - right);
+		GLfloat bt = 1.0f / (bottom - top);
+		GLfloat nf = 1.0f / (nearPlane - farPlane);
+
+		M[0] = -2.0f * lr; M[4] = 0.0f;       M[8] = 0.0f;       M[12] = (left + right) * lr;
+		M[1] = 0.0f;       M[5] = -2.0f * bt; M[9] = 0.0f;       M[13] = (top + bottom) * bt;
+		M[2] = 0.0f;       M[6] = 0.0f;       M[10] = 2.0f * nf; M[14] = (farPlane + nearPlane) * nf;
+		M[3] = 0.0f;	   M[7] = 0.0f;       M[11] = 0.0f;      M[15] = 1.0f;
+	}
+
+	static void lookAt(GLfloat M[], const GLfloat eye[], const GLfloat center[], const GLfloat up[])
+	{
+		GLfloat x0, x1, x2,
+			y0, y1, y2,
+			z0, z1, z2,
+			length;
+
+		GLfloat eyeX = eye[0];
+		GLfloat eyeY = eye[1];
+		GLfloat eyeZ = eye[2];
+		GLfloat upX = up[0];
+		GLfloat upY = up[1];
+		GLfloat upZ = up[2];
+		GLfloat centerX = center[0];
+		GLfloat centerY = center[1];
+		GLfloat centerZ = center[2];
+
+		if (abs(eyeX - centerX) < GLOBAL_CONSTANTS::EPSILON &&
+			abs(eyeY - centerY) < GLOBAL_CONSTANTS::EPSILON &&
+			abs(eyeZ - centerZ) < GLOBAL_CONSTANTS::EPSILON) {
+
+			identity(M);
+		}
+		else {
+			z0 = eyeX - centerX;
+			z1 = eyeY - centerY;
+			z2 = eyeZ - centerZ;
+
+			length = 1.0f / sqrt(z0 * z0 + z1 * z1 + z2 * z2);
+			z0 *= length;
+			z1 *= length;
+			z2 *= length;
+
+			x0 = upY * z2 - upZ * z1;
+			x1 = upZ * z0 - upX * z2;
+			x2 = upX * z1 - upY * z0;
+			length = sqrt(x0 * x0 + x1 * x1 + x2 * x2);
+			if (!length) {
+				x0 = 0.0f;
+				x1 = 0.0f;
+				x2 = 0.0f;
+			}
+			else {
+				length = 1.0f / length;
+				x0 *= length;
+				x1 *= length;
+				x2 *= length;
+			}
+
+			y0 = z1 * x2 - z2 * x1;
+			y1 = z2 * x0 - z0 * x2;
+			y2 = z0 * x1 - z1 * x0;
+
+			length = sqrt(y0 * y0 + y1 * y1 + y2 * y2);
+			if (!length) {
+				y0 = 0.0f;
+				y1 = 0.0f;
+				y2 = 0.0f;
+			}
+			else {
+				length = 1.0f / length;
+				y0 *= length;
+				y1 *= length;
+				y2 *= length;
+			}
+
+			M[0] = x0;    M[4] = x1;   M[8] = x2;    M[12] = -(x0 * eyeX + x1 * eyeY + x2 * eyeZ);
+			M[1] = y0;    M[5] = y1;   M[9] = y2;    M[13] = -(y0 * eyeX + y1 * eyeY + y2 * eyeZ);
+			M[2] = z0;    M[6] = z1;   M[10] = z2;   M[14] = -(z0 * eyeX + z1 * eyeY + z2 * eyeZ);
+			M[3] = 0.0f;  M[7] = 0.0f; M[11] = 0.0f; M[15] = 1.0f;
+		}
 	}
 
 	// Performs a matrix multiplication

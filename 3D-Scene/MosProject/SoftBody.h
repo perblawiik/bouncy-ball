@@ -139,6 +139,11 @@ public:
 			if (X(j, 2) < (-s.RADIUS * 2.0f)) {
 				V(j, 2) = 0.0f; // Set velocity to zero
 				X(j, 2) = -s.RADIUS * 2.0f; // Move the position to ground level
+
+				float friction = 0.9f;
+				// Add friction
+				V(j, 1) = V(j, 1) * friction;
+				V(j, 3) = V(j, 3) * friction;
 			}
 		}
 	}
