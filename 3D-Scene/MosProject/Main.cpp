@@ -20,8 +20,6 @@
 #include <sstream>
 
 /** CONSTANTS **/
-const unsigned int WINDOW_WIDTH = GLOBAL_CONSTANTS::window::WIDTH;
-const unsigned int WINDOW_HEIGHT = GLOBAL_CONSTANTS::window::HEIGHT;
 const GLfloat PI = GLOBAL_CONSTANTS::PI;
 
 /** FUNCTION DECLARATIONS **/
@@ -60,8 +58,11 @@ int main()
 	// Activate MSAA (Multisampling Anti Aliasing)
 	glfwWindowHint(GLFW_SAMPLES, 4);
 
+	int width = GLOBAL_CONSTANTS::window::WIDTH;
+	int height = GLOBAL_CONSTANTS::window::HEIGHT;
+
 	// Create window object
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Bouncy Ball", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(width, height, "Bouncy Ball", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -120,7 +121,7 @@ int main()
 
 	// Perspective projection matrix
 	GLfloat perspectiveMatrix[16] = { 0 };
-	MATRIX4::perspective(perspectiveMatrix, PI / 3, (GLfloat)WINDOW_WIDTH/(GLfloat)WINDOW_HEIGHT, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
+	MATRIX4::perspective(perspectiveMatrix, PI / 3, (GLfloat)width/(GLfloat)height, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
 	mainShader.setFloatMat4(perspectiveMatrixLocationID, perspectiveMatrix); // Insert Projection Matrix
 
 
@@ -202,14 +203,75 @@ int main()
 	Mesh ball;
 	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
 	ball.addAnimation("BouncyBall_back_left"); // ID: 0
+	/*
 	ball.addAnimation("BouncyBall_back_right"); // ID: 1
 	ball.addAnimation("BouncyBall_front_left"); // ID: 2
 	ball.addAnimation("BouncyBall_straight_up"); // ID: 3
 	ball.addAnimation("BouncyBall_front_right"); // ID: 4
+	*/
 
 	// Load textures
 	Texture woodenFloorTexture("Files//Textures//wooden_floor.jpg");
 	Texture footballTexture("Files//Textures//football.jpg");
+
+
+	/** SHADOW MAPPING STUFF **/
+	/*
+	// Framebuffer object for rendering the depth map
+	unsigned int depthMapFBO;
+	glGenFramebuffers(1, &depthMapFBO);
+
+	const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+
+	// Create a 2D texture as depth buffer
+	unsigned int depthMap;
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	// Attach the depth texture as the framebuffer's depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Use an orthographic projection matrix for the light source (no perspective needed since the light rays are parallell)
+	GLfloat nearPlane = 1.0f, farPlane = 7.5f;
+	GLfloat lightProjection[16] = { 0.0f };
+	MATRIX4::orthogonal(
+		lightProjection, // Matrix
+		-10.0f, 10.0f, -10.0f, 10.0f, // Left, right, down, up
+		nearPlane, farPlane
+	);
+
+	// Create a view matrix to transform each object so they're visible from the light's point of view
+	GLfloat lightView[16] = { 0.0f };
+	GLfloat up[] = { 0.0f, 1.0f, 0.0f };
+	GLfloat center[] = { 0.0f, 0.0f, 0.0f };
+	MATRIX4::lookAt(
+		lightView,
+		lightPosition,
+		center,
+		up
+	);
+
+	// Create a light space matrix that transforms world-space vertices into the space as visible from the light source
+	GLfloat lightSpaceMatrix[16] = { 0.0f };
+	MATRIX4::multiply(lightProjection, lightView, lightSpaceMatrix);
+	
+	// Create shader for rendering depth map
+	Shader depthMapShader("Shaders//depthMapVert.glsl", "Shaders//depthMapFrag.glsl");
+	depthMapShader.use();
+	depthMapShader.setFloatMat4("lightSpaceMatrix", lightSpaceMatrix);
+	depthMapShader.setFloatMat4("modelView", modelViewMatrix);
+	*/
+
+	/*********************/
 	
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
@@ -233,18 +295,48 @@ int main()
 		processInput(window); 
 		controller.processInput(deltaTime);
 
+
+		// Render to depth map
+		/*
+		depthMapShader.use();
+		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		// Render scene
+		// FLOOR
+		MATRIX4::translate(modelViewMatrix, 0.0f, -settings.RADIUS*2.0f, 0.0f); // Place the floor
+		depthMapShader.setFloatMat4("modelViewMatrix", modelViewMatrix); // Update with new model view matrix
+		floor.render(); // Draw
+
+		// ANIMATION 0
+		MATRIX4::translate(modelViewMatrix, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f)); // Position the sphere
+		depthMapShader.setFloatMat4("modelViewMatrix", modelViewMatrix); // Update with new model view matrix
+		ball.startAnimation(0); // Use animation id 0
+		ball.update(); // Update animation
+		ball.render(); // Draw
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		*/
+
+		// Get window size (it will change if the user resizes the window)
+		glfwGetWindowSize(window, &width, &height);
+		// Set viewport
+		glViewport(0, 0, width, height); // The entire window
+
 		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		
 		// Activate lamp shader
 		lampShader.use();
 		MATRIX4::translate(modelViewMatrix, lightPosition[0], lightPosition[1], lightPosition[2]); // Place the lamp
 		lampShader.setFloatMat4("modelView", modelViewMatrix); // Update with new model view matrix
 		lamp.render(); // Draw
-
+		
 
 		// Activate main shader
 		mainShader.use();
+
 		// Update camera position in shader
 		mainShader.setVec3(
 			cameraPositionLocationID, 

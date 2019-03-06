@@ -156,6 +156,8 @@
     <ClInclude Include="Transform.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\depthMapFrag.glsl" />
+    <None Include="Shaders\depthMapVert.glsl" />
     <None Include="Shaders\fragment.glsl" />
     <None Include="Shaders\lampFrag.glsl" />
     <None Include="Shaders\lampVert.glsl" />
