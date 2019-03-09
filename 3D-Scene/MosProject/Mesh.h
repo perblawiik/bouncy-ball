@@ -17,7 +17,7 @@ class Mesh
 public:
 
 	Mesh()
-		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8), animationID(-1)
+		: meshIsEmpty(true), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), stride(8)
 	{ }
 
 	~Mesh()
@@ -79,44 +79,6 @@ public:
 
 			// Deactivate (unbind) the VAO and the buffers again.
 			this->unbindBuffersAndVertexArrayObject();
-		}
-	}
-
-	void addAnimation(const std::string &fileName)
-	{
-		// Input File Stream
-		std::ifstream inFile;
-		if (inFile) {
-			// Temporary string to store each read line
-			std::string line;
-			std::string filePath = ("Simulations//Saves//" + fileName + ".sim");
-
-			// Open file for reading
-			inFile.open(filePath, std::ifstream::in);
-
-			// Get simulation time step
-			std::getline(inFile, line);
-			float timeStep = std::stof(line);
-			// Get number of steps in the simulation
-			std::getline(inFile, line);
-			int numSteps = std::stoi(line);
-			// Get the size each vertex array
-			std::getline(inFile, line);
-			int numColumns = std::stoi(line);
-
-			// Allocate memory for the data set
-			Matrix* simulationData = new Matrix(numSteps, numColumns);
-				
-			int counter = 0;
-			while (std::getline(inFile, line)) {
-
-				(*simulationData)[counter] = std::stof(line);
-				++counter;
-			}
-			inFile.close();
-
-			this->animations.push_back(new Animation(simulationData, timeStep, numSteps));
-			++animationID;
 		}
 	}
 
@@ -348,43 +310,6 @@ public:
 		}
 	}
 
-	void update()
-	{
-		if (!animations.empty()) {
-
-			animations[animationID]->update();
-			// Update the vertex array of the mesh from the animation step data
-			for (int i = 0; i < numVertices; ++i) {
-				// Vertex coordinates
-				vertices[i * 8] = animations[animationID]->getAnimationStepData()[i * 6];
-				vertices[(i * 8) + 1] = animations[animationID]->getAnimationStepData()[(i * 6) + 1];
-				vertices[(i * 8) + 2] = animations[animationID]->getAnimationStepData()[(i * 6) + 2];
-				// Normal
-				vertices[(i * 8) + 3] = animations[animationID]->getAnimationStepData()[(i * 6) + 3];
-				vertices[(i * 8) + 4] = animations[animationID]->getAnimationStepData()[(i * 6) + 4];
-				vertices[(i * 8) + 5] = animations[animationID]->getAnimationStepData()[(i * 6) + 5];
-			}
-
-			this->updateVertexBufferData();
-		}
-	}
-
-	void startAnimation(const int ID)
-	{
-		if (!animations.empty()) {
-			selectAnimation(ID);
-			animations[ID]->startAnimation();
-		}
-	}
-
-	void stopAnimation(const int ID)
-	{
-		if (!animations.empty()) {
-			selectAnimation(ID);
-			animations[ID]->stopAnimation();
-		}
-	}
-
 private:
 
 	bool meshIsEmpty;
@@ -398,22 +323,6 @@ private:
 	int stride; // Number of elements per row in the vertex array
 	int numTriangles; // Number of triangels of the mesh
 	int numVertices; // Number of vertices of the mesh
-
-	std::vector<Animation*> animations;
-
-	int animationID;
-
-
-	void selectAnimation(const unsigned int ID)
-	{
-		// Check if ID exists
-		if (ID >= 0 && ID < animations.size()) {
-			animationID = ID;
-		}
-		else {
-			std::cout << "Warning! Mesh::Select Animation::Animation ID not found!" << std::endl;
-		}
-	}
 
 	void generateBuffersAndVertexArrayObject()
 	{
@@ -494,18 +403,6 @@ private:
 
 		this->numTriangles = 0;
 		this->numVertices = 0;
-
-		if (!animations.empty()) {
-			std::for_each(animations.begin(), animations.end(), this->deallocateAnimations);
-			animations.clear();
-			animationID = -1;
-		}
-	}
-
-	static void deallocateAnimations(Animation* a)
-	{
-		delete a;
-		a = nullptr;
 	}
 };
 

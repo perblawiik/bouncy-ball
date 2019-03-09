@@ -85,7 +85,6 @@ private:
 		/*** First, add scale matrix ***/
 		MATRIX4::scale(matrix4, scale[0]);
 
-
 		/*** Second, add rotation matrix ***/
 		// 1. Create the rotation matrix by applying rotation to x, y, z one at the time
 		GLfloat rotMat[16];
@@ -104,7 +103,7 @@ private:
 		MATRIX4::multiply(dummy, matrix4, matrix4);
 
 		if (parent) {
-			MATRIX4::multiply(parent->matrix4, matrix4, matrix4);
+			MATRIX4::multiply(matrix4, parent->matrix4, matrix4);
 		}
 
 		if (inverted) { // Invert the final transformation matrix

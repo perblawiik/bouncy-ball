@@ -8,9 +8,7 @@
 #endif
 
 #include <glad/glad.h>
-#include <string>
 #include <iostream>
-
 
 class Texture
 {

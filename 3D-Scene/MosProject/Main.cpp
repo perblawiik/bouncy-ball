@@ -10,6 +10,7 @@
 #include "Camera.h"
 #include "CameraController.h"
 #include "Texture.h"
+#include "Object.h"
 
 #include <iostream>
 #include <fstream>
@@ -91,39 +92,23 @@ int main()
 	glClearColor(0.25f, 0.25f, 0.25f, 1.0f); // Set the color for every clear call
 	glEnable(GL_DEPTH_TEST); // Enable depth so that objects closest to the camera view is visible
 	glEnable(GL_MULTISAMPLE);
-	
+
+	/*************/
+	/** SHADERS **/
+	/*************/
 	// Create our main shader (responsible for all the lighting in the scene)
 	Shader mainShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
 	// Activate shader
 	mainShader.use();
 
-	// Location IDs for shader uniforms
-	GLint modelViewMatrixLocationID; // Model View Matrix
-	GLint cameraViewMatrixLocationID; // Camera View Matrix
-	GLint perspectiveMatrixLocationID; // Perspective Matrix
-	GLint colorLocationID; // Surface color for objects
-	GLint cameraPositionLocationID; // Camera position
-	
-	// Get uniform location IDs from the shader (prints warning message to console if not found)
-	getUniformLocationIDs(
-		mainShader, 
-		modelViewMatrixLocationID, 
-		cameraViewMatrixLocationID, 
-		perspectiveMatrixLocationID, 
-		colorLocationID,
-		cameraPositionLocationID
-	);
-
 	// Modelview matrix
 	GLfloat modelViewMatrix[16] = { 0 };
 	MATRIX4::identity(modelViewMatrix); // Identity matrix as default
-	mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Insert Model View Matrix
-
+	mainShader.setFloatMat4("modelView", modelViewMatrix); // Insert Model View Matrix
 	// Perspective projection matrix
 	GLfloat perspectiveMatrix[16] = { 0 };
-	MATRIX4::perspective(perspectiveMatrix, PI / 3, (GLfloat)width/(GLfloat)height, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
-	mainShader.setFloatMat4(perspectiveMatrixLocationID, perspectiveMatrix); // Insert Projection Matrix
-
+	MATRIX4::perspective(perspectiveMatrix, PI / 3, (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
+	mainShader.setFloatMat4("perspective", perspectiveMatrix); // Insert Projection Matrix
 
 	// Lamp shader
 	Shader lampShader("Shaders//lampVert.glsl", "Shaders//lampFrag.glsl");
@@ -140,33 +125,20 @@ int main()
 		1.0f, 1.0f, 1.0f
 	};
 
-	lampShader.setVec3("objectColor", lightColor[0], lightColor[1], lightColor[2]); // Set color
-
-	// Create a sphere mesh for the lamp
-	Mesh lamp;
-	lamp.createSphere(8, 10.0f);
-
 	// Set light position and color in the main shader
 	mainShader.use();
 	mainShader.setVec3("lightPosition", lightPosition[0], lightPosition[1], lightPosition[2]);
 	mainShader.setVec3("lightColor", lightColor[0], lightColor[1], lightColor[2]);
 
-	// Create a camera for the scene
-	Camera camera(&mainShader);
-	// Back the camera away from the origin 
-	camera.setPosition(0.0f, 0.0f, 100.0f); // (x, y, z)
-	// Add lamp shader to the camera view
-	camera.addShader(&lampShader);
 
-	// Create a camera controller
-	CameraController controller(&camera, window);
-	controller.setMouseSensitivity(20.0f);
-	
+	/****************/
+	/** SIMULATION **/
+	/****************/
 	// Settings for the simulation model of the softbody
 	Settings settings = {};
 	settings.h = 0.01f; // Time step size
 	settings.k = 0.1f; // Spring constant
-	settings.b = settings.k/50.0f; // Resistance constant
+	settings.b = settings.k / 50.0f; // Resistance constant
 	settings.g = 9.82f; // Gravitation constant
 	settings.DIM = 3; // 3-D (x,y,z)
 	settings.RADIUS = 10.0f;
@@ -175,12 +147,11 @@ int main()
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	settings.NUM_SEGS = 16; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
 	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
-
 	/*
 	// Create a sphere mesh (for the softbody)
 	Mesh sphere;
 	sphere.createSphere(settings.NUM_SEGS, settings.RADIUS);
-	
+
 	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
 	// Set the mesh of our softbody to the sphere created earlier
@@ -196,82 +167,62 @@ int main()
 	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
 	*/
 
-	// Create a XZ-plane as floor
-	Mesh floor;
-	floor.createPlaneXZ(600.0f, 600.0f);
-	
-	Mesh ball;
-	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
-	ball.addAnimation("BouncyBall_back_left"); // ID: 0
-	/*
-	ball.addAnimation("BouncyBall_back_right"); // ID: 1
-	ball.addAnimation("BouncyBall_front_left"); // ID: 2
-	ball.addAnimation("BouncyBall_straight_up"); // ID: 3
-	ball.addAnimation("BouncyBall_front_right"); // ID: 4
-	*/
 
-	// Load textures
+	/**************/
+	/** TEXTURES **/
+	/**************/
 	Texture woodenFloorTexture("Files//Textures//wooden_floor.jpg");
 	Texture footballTexture("Files//Textures//football.jpg");
 
 
-	/** SHADOW MAPPING STUFF **/
-	/*
-	// Framebuffer object for rendering the depth map
-	unsigned int depthMapFBO;
-	glGenFramebuffers(1, &depthMapFBO);
+	/************/
+	/** CAMERA **/
+	/************/
+	// Create a camera for the scene
+	Camera camera(&mainShader);
+	// Back the camera away from the origin 
+	camera.setPosition(0.0f, 0.0f, 100.0f); // (x, y, z)
+	// Add lamp shader to the camera view
+	camera.addShader(&lampShader);
 
-	const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+	// Create a camera controller
+	CameraController cameraController(&camera, window);
+	cameraController.setMouseSensitivity(20.0f);
 
-	// Create a 2D texture as depth buffer
-	unsigned int depthMap;
-	glGenTextures(1, &depthMap);
-	glBindTexture(GL_TEXTURE_2D, depthMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-	// Attach the depth texture as the framebuffer's depth buffer
-	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	/*******************/
+	/** SCENE OBJECTS **/
+	/*******************/
+	// Create a sphere mesh for the lamp
+	Mesh lampSphere;
+	lampSphere.createSphere(8, 10.0f);
+	// Create a lamp object
+	Object lamp;
+	lamp.setMesh(&lampSphere);
+	lamp.setColor(lightColor[0], lightColor[1], lightColor[2]);
+	lamp.setPosition(lightPosition[0], lightPosition[1], lightPosition[2]);
 
-	// Use an orthographic projection matrix for the light source (no perspective needed since the light rays are parallell)
-	GLfloat nearPlane = 1.0f, farPlane = 7.5f;
-	GLfloat lightProjection[16] = { 0.0f };
-	MATRIX4::orthogonal(
-		lightProjection, // Matrix
-		-10.0f, 10.0f, -10.0f, 10.0f, // Left, right, down, up
-		nearPlane, farPlane
-	);
+	// Create a plane mesh for the floor
+	Mesh plane;
+	plane.createPlaneXZ(600.0f, 600.0f);
+	// Create floor object
+	Object floor;
+	floor.setMesh(&plane);
+	floor.setTexture(&woodenFloorTexture);
+	floor.setPosition(0.0f, -settings.RADIUS*2.0f, 0.0f);
 
-	// Create a view matrix to transform each object so they're visible from the light's point of view
-	GLfloat lightView[16] = { 0.0f };
-	GLfloat up[] = { 0.0f, 1.0f, 0.0f };
-	GLfloat center[] = { 0.0f, 0.0f, 0.0f };
-	MATRIX4::lookAt(
-		lightView,
-		lightPosition,
-		center,
-		up
-	);
-
-	// Create a light space matrix that transforms world-space vertices into the space as visible from the light source
-	GLfloat lightSpaceMatrix[16] = { 0.0f };
-	MATRIX4::multiply(lightProjection, lightView, lightSpaceMatrix);
-	
-	// Create shader for rendering depth map
-	Shader depthMapShader("Shaders//depthMapVert.glsl", "Shaders//depthMapFrag.glsl");
-	depthMapShader.use();
-	depthMapShader.setFloatMat4("lightSpaceMatrix", lightSpaceMatrix);
-	depthMapShader.setFloatMat4("modelView", modelViewMatrix);
-	*/
-
-	/*********************/
+	// Create a mesh and load a prepared mesh for the bouncy ball
+	Mesh ball;
+	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
+	// Create bouncy ball object
+	Object bouncyBall;
+	bouncyBall.setMesh(&ball);
+	bouncyBall.setTexture(&footballTexture);
+	bouncyBall.addAnimation("BouncyBall_back_left"); // ID: 0
+	bouncyBall.addAnimation("BouncyBall_back_right"); // ID: 1
+	bouncyBall.addAnimation("BouncyBall_front_left"); // ID: 2
+	bouncyBall.addAnimation("BouncyBall_straight_up"); // ID: 3
+	bouncyBall.addAnimation("BouncyBall_front_right"); // ID: 4
 	
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
@@ -293,30 +244,16 @@ int main()
 
 		// Read inputs
 		processInput(window); 
-		controller.processInput(deltaTime);
+		cameraController.processInput(deltaTime); // Camera navigation
 
-
-		// Render to depth map
-		/*
-		depthMapShader.use();
-		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		// Render scene
-		// FLOOR
-		MATRIX4::translate(modelViewMatrix, 0.0f, -settings.RADIUS*2.0f, 0.0f); // Place the floor
-		depthMapShader.setFloatMat4("modelViewMatrix", modelViewMatrix); // Update with new model view matrix
-		floor.render(); // Draw
-
-		// ANIMATION 0
-		MATRIX4::translate(modelViewMatrix, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f)); // Position the sphere
-		depthMapShader.setFloatMat4("modelViewMatrix", modelViewMatrix); // Update with new model view matrix
-		ball.startAnimation(0); // Use animation id 0
-		ball.update(); // Update animation
-		ball.render(); // Draw
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		*/
+		// Update camera position in shader
+		mainShader.use();
+		mainShader.setVec3(
+			"cameraView",
+			camera.getPosition()[0],
+			camera.getPosition()[1],
+			camera.getPosition()[2]
+		);
 
 		// Get window size (it will change if the user resizes the window)
 		glfwGetWindowSize(window, &width, &height);
@@ -325,88 +262,53 @@ int main()
 
 		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		
-		// Activate lamp shader
-		lampShader.use();
-		MATRIX4::translate(modelViewMatrix, lightPosition[0], lightPosition[1], lightPosition[2]); // Place the lamp
-		lampShader.setFloatMat4("modelView", modelViewMatrix); // Update with new model view matrix
-		lamp.render(); // Draw
 		
 
-		// Activate main shader
-		mainShader.use();
+		// Draw lamp
+		lamp.render(&lampShader);
 
-		// Update camera position in shader
-		mainShader.setVec3(
-			cameraPositionLocationID, 
-			camera.getPosition()[0],
-			camera.getPosition()[1],
-			camera.getPosition()[2]
-		);
+		// Draw floor
+		floor.render(&mainShader);
 
-		// Use texture
-		woodenFloorTexture.use(); 
-		// FLOOR
-		MATRIX4::translate(modelViewMatrix, 0.0f, -settings.RADIUS*2.0f, 0.0f); // Place the floor
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Update with new model view matrix
-		mainShader.setVec3(colorLocationID, 0.75f, 0.75f, 0.75f); // Set color to Light Gray
-		floor.render(); // Draw
+		// Draw bouncy balls
+		// Animation 0
+		bouncyBall.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
+		bouncyBall.setPosition(-settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
+		bouncyBall.startAnimation(0);
+		bouncyBall.update(); // Update animation
+		bouncyBall.render(&mainShader); // Draw
+		// Animation 1
+		bouncyBall.setColor(1.0f, 0.0f, 1.0f); // Set color to Magenta
+		bouncyBall.setPosition(settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
+		bouncyBall.startAnimation(1);
+		bouncyBall.update(); // Update animation
+		bouncyBall.render(&mainShader); // Draw
+		// Animation 2
+		bouncyBall.setColor(1.0f, 0.5f, 0.0f); // Set color to Orange
+		bouncyBall.setPosition(-settings.RADIUS*2.0f, 0.0f, 0.0f);
+		bouncyBall.startAnimation(2);
+		bouncyBall.update(); // Update animation
+		bouncyBall.render(&mainShader); // Draw
+		// Animation 3
+		bouncyBall.setColor(0.0f, 1.0f, 1.0f); // Set color to Cyan
+		bouncyBall.setPosition(0.0f, 0.0f, 0.0f);
+		bouncyBall.startAnimation(3);
+		bouncyBall.update(); // Update animation
+		bouncyBall.render(&mainShader); // Draw
+		// Animation 4
+		bouncyBall.setColor(1.0f, 1.0f, 1.0f); // Set color to White
+		bouncyBall.setPosition(settings.RADIUS*2.0f, 0.0f, 0.0f);
+		bouncyBall.startAnimation(4);
+		bouncyBall.update(); // Update animation
+		bouncyBall.render(&mainShader); // Draw
 
-		
-		// Use texture
-		footballTexture.use(); 
-		// ANIMATION 0
-		MATRIX4::translate(modelViewMatrix, -settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f)); // Position the sphere
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Update with new model view matrix
-		mainShader.setVec3(colorLocationID, 1.0f, 0.25f, 0.25f); // Set color to Red
-		ball.startAnimation(0); // Use animation id 0
-		ball.update(); // Update animation
-		ball.render(); // Draw
-		
-		
-		// ANIMATION 1
-		MATRIX4::translate(modelViewMatrix, settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f)); // Position the sphere
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Update with new model view matrix
-		mainShader.setVec3(colorLocationID, 1.0f, 0.5f, 0.0f); // Set color to Orange
-		ball.startAnimation(1); // Use animation id 1
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-
-		// ANIMATION 2
-		MATRIX4::translate(modelViewMatrix, -settings.RADIUS*2.0f, 0.0f, 0.0f); // Position the sphere
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Update with new model view matrix
-		mainShader.setVec3(colorLocationID, 0.0f, 1.0f, 1.0f); // Set color to Cyan
-		ball.startAnimation(2); // Use animation id 2
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-		
-		// ANIMATION 3
-		MATRIX4::translate(modelViewMatrix, 0.0f, 0.0f, 0.0f); // Position the sphere
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Update with new model view matrix
-		mainShader.setVec3(colorLocationID, 0.2f, 0.2f, 0.2f); // Set color to Dark Grey
-		ball.startAnimation(3); // Use animation id 3
-		ball.update(); // Update animation
-		ball.render(); // Draw
-
-
-		// ANIMATION 4
-		MATRIX4::translate(modelViewMatrix, settings.RADIUS*2.0f, 0.0f, 0.0f); // Position the sphere
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix); // Update with new model view matrix
-		mainShader.setVec3(colorLocationID, 1.0f, 0.0f, 1.0f); // Set color to Magenta
-		ball.startAnimation(4); // Use animation id 4
-		ball.update(); // Update animation
-		ball.render(); // Draw
-		
 		/*
 		footballTexture.use();
 		// Place sphere infront of the camera
 		MATRIX4::translate(modelViewMatrix, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix
-		mainShader.setFloatMat4(modelViewMatrixLocationID, modelViewMatrix);
-		mainShader.setVec3(colorLocationID, 1.0f, 0.5f, 0.0f); // Set color to Orange
+		mainShader.setFloatMat4("modelView", modelViewMatrix);
+		mainShader.setVec3("objectColor", 1.0f, 0.5f, 0.0f); // Set color to Orange
 		// Render (draw) the simulation one step at the time
 		renderSimulationStep(
 			stepCounter, // Keeps count of which simulation step to draw

@@ -82,8 +82,8 @@
     <LibraryPath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\persj\Documents\GitHub\MosProject\MosProject\Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VC_SourcePath)Libraries\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VC_SourcePath)Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -148,6 +148,7 @@
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Object.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="SoftBody.h" />
     <ClInclude Include="stb_image.h" />
