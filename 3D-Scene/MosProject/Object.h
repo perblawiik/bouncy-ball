@@ -17,7 +17,7 @@ class Object
 public:
 
 	Object()
-		: mesh(nullptr), texture(nullptr), transform(Transform()), color(new GLfloat[3]), animationID(-1)
+		: mesh(nullptr), texture(nullptr), transform(Transform()), color(new GLfloat[3]), animationID(-1), staticPoseID(-1)
 	{
 		color[0] = 1.0f; color[1] = 1.0f; color[2] = 1.0f; // Set default color to white
 	}
@@ -28,9 +28,15 @@ public:
 		color = nullptr;
 
 		if (!animations.empty()) {
-			std::for_each(animations.begin(), animations.end(), this->deallocateAnimations);
+			std::for_each(animations.begin(), animations.end(), this->deallocateAnimation);
 			animations.clear();
 			animationID = -1;
+		}
+
+		if (!staticPoses.empty()) {
+			std::for_each(staticPoses.begin(), staticPoses.end(), this->deallocatePose);
+			staticPoses.clear();
+			staticPoseID = -1;
 		}
 	}
 
@@ -87,19 +93,19 @@ public:
 		}
 	}
 
-	void startAnimation(const int ID)
+	void startAnimation(const int id)
 	{
 		if (!animations.empty()) {
-			selectAnimation(ID);
-			animations[ID]->startAnimation();
+			selectAnimation(id);
+			animations[id]->startAnimation();
 		}
 	}
 
-	void stopAnimation(const int ID)
+	void stopAnimation(const int id)
 	{
 		if (!animations.empty()) {
-			selectAnimation(ID);
-			animations[ID]->stopAnimation();
+			selectAnimation(id);
+			animations[id]->stopAnimation();
 		}
 	}
 
@@ -116,6 +122,29 @@ public:
 	void setScale(const GLfloat &x, const GLfloat &y, const GLfloat &z)
 	{
 		transform.setScale(x, y, z);
+	}
+
+	int addStaticPose(const GLfloat matrix4[])
+	{
+		GLfloat *mat = new GLfloat[16];
+		for (int i = 0; i < 16; ++i) {
+			mat[i] = matrix4[i];
+		}
+		this->staticPoses.push_back(mat);
+		++staticPoseID;
+	
+		return this->staticPoses.size() - 1;
+	}
+
+	void useStaticPose(const int id)
+	{
+		if (id < (int)staticPoses.size()) {
+			this->staticPoseID = id;
+		}
+		else {
+			std::cout << "Warning! Object::Function Use Static Pose::Pose ID doesnt exist!" << std::endl;
+		}
+		
 	}
 
 	void update()
@@ -150,7 +179,13 @@ public:
 		if (mesh)
 		{
 			shader->setFloat3("objectColor", color);
-			shader->setFloatMat4("modelView", transform.matrix4);
+			if (staticPoseID >= 0 && !staticPoses.empty()) {
+				shader->setFloatMat4("modelView", staticPoses[staticPoseID]);
+			}
+			else {
+				shader->setFloatMat4("modelView", transform.matrix4);
+			}
+			
 			mesh->render();
 		}
 	}
@@ -165,6 +200,9 @@ private:
 	std::vector<Animation*> animations;
 	int animationID;
 
+	std::vector<GLfloat*> staticPoses;
+	int staticPoseID;
+
 	void selectAnimation(const unsigned int ID)
 	{
 		// Check if ID exists
@@ -176,10 +214,15 @@ private:
 		}
 	}
 
-	static void deallocateAnimations(Animation* a)
+	static void deallocateAnimation(Animation* a)
 	{
 		delete a;
 		a = nullptr;
+	}
+	static void deallocatePose(GLfloat* array)
+	{
+		delete[] array;
+		array = nullptr;
 	}
 };
 

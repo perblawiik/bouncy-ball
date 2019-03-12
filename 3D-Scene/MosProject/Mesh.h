@@ -82,18 +82,33 @@ public:
 		}
 	}
 
-	void createPlaneXZ(const GLfloat &WIDTH, const GLfloat &HEIGHT)
+	void createPlaneXZ(const GLfloat &WIDTH, const GLfloat &HEIGHT, GLfloat textureWidth = -1.0f, GLfloat textureHeight = -1.0f)
 	{
 		// Clean up any previous mesh data
 		this->clean();
 		meshIsEmpty = false;
 
+		GLfloat s, t;
+		if (textureWidth > GLOBAL_CONSTANTS::EPSILON) {
+			s = WIDTH / textureWidth;
+		}
+		else {
+			s = 1.0f;
+		}
+
+		if (textureHeight > GLOBAL_CONSTANTS::EPSILON) {
+			t = HEIGHT / textureHeight;
+		}
+		else {
+			t = 1.0f;
+		}
+
 		const GLfloat vertexData[] = {
 			// Position Coordinates                    // Normals          // Texture coordinates
 			-(WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 0.0f, // Upper left
-			 (WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 0.0f, // Upper right
-			 (WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, // Lower right
-			-(WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, 1.0f  // Lower left
+			 (WIDTH / 2.0f), 0.0f, -(HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   s, 0.0f, // Upper right
+			 (WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   s, t, // Lower right
+			-(WIDTH / 2.0f), 0.0f,  (HEIGHT / 2.0f),   0.0f, 1.0f, 0.0f,   0.0f, t  // Lower left
 		};
 
 		const GLuint indexData[] = {
@@ -144,11 +159,6 @@ public:
 		int numVerticalSegments = 2 * numHorizontalSegments;
 		this->numVertices = 1 + (numHorizontalSegments - 1) * numVerticalSegments + 1; // top + middle + bottom
 		this->numTriangles = numVerticalSegments + (numHorizontalSegments - 2) * 4 * numHorizontalSegments + numVerticalSegments; // top + middle + bottom
-
-		// Information about the sphere mesh
-		std::cout << "Number of vertices: " << numVertices << std::endl;
-		std::cout << "Number of triangles: " << numTriangles << std::endl;
-		std::cout << "Sphere radius: " << radius << std::endl;
 
 		this->vertices = new GLfloat[numVertices * stride]; // Initialize vertex array
 		this->indices = new GLuint[numTriangles * 3]; // Initialize index array
@@ -256,6 +266,357 @@ public:
 		// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
 		this->configureVertexArrayAttributes();
 		
+		// Deactivate (unbind) the VAO and the buffers again.
+		this->unbindBuffersAndVertexArrayObject();
+	}
+
+	void createCylinder2 (int vertSegs, int horizSegs, const GLfloat &radius, const GLfloat &height) {
+
+		this->clean();
+
+		this->meshIsEmpty = false;
+
+		if (horizSegs < 1) {
+			horizSegs = 1;
+		}
+		if (vertSegs < 4) {
+			vertSegs = 4;
+		}
+
+		this->numVertices = (4 * vertSegs) + 2 + (vertSegs * (horizSegs - 1));
+		this->numTriangles = 2 * vertSegs * (1 + horizSegs);
+
+		this->vertices = new GLfloat[numVertices * stride];
+		this->indices = new GLuint[3 * numTriangles];
+
+		// Bottom center
+		// Vertex coordinates
+		vertices[0] = 0.0f; vertices[1] = -(height / 2.0f); vertices[2] = 0.0f;
+		// Normal coordinates
+		vertices[3] = 0.0f; vertices[4] = -1.0f; vertices[5] = 0.0f;
+		// Texture coordinates
+		vertices[6] = 0.5f; vertices[7] = 0.5f;
+
+
+		const GLfloat PI = GLOBAL_CONSTANTS::PI;
+		// Go from bottom to top (Y € -PI < theta < PI )
+		GLfloat theta = -PI;
+		// Begin at Z = 0 (Z € 0 < phi < 2PI )
+		GLfloat phi = 0.0f;
+
+		int index = 7;
+		// Generate vertices and normals for bottom circle plane (all normals should be (0.0, -1.0, 0.0))
+		for (int j = 0; j < vertSegs; ++j) {
+
+			// Vertex (x, y, z)
+			vertices[++index] = radius * sin(phi);
+			vertices[++index] = -(height / 2.0f); // The bottom circle is on the plane y = -height/2
+			vertices[++index] = radius * cos(phi);
+			// Normal (x, y, z)
+			vertices[++index] = 0.0f;
+			vertices[++index] = -1.0f;
+			vertices[++index] = 0.0f;
+			// Textures (s, t)
+			vertices[++index] = cos(phi) * 0.5f + 0.5f; 
+			vertices[++index] = sin(phi + PI) * 0.5f + 0.5f;
+
+			phi += (2.0f * PI) / (GLfloat)vertSegs;
+		}
+
+		// Begin at Z = 0 (Z € 0 < phi < 2PI )
+		phi = 0.0f;
+		// Generate middle part vertices with normals (from bottom to top)
+		for (int i = 0; i < horizSegs + 1; ++i) {
+
+			GLfloat y = cos(theta);
+			for (int j = 0; j < vertSegs; ++j) {
+
+				// Vertex (x, y, z)
+				vertices[++index] = radius * sin(phi);
+				vertices[++index] = (height / 2.0f) * y;
+				vertices[++index] = radius * cos(phi);
+				// Normal (x, y, z)
+				vertices[++index] = sin(phi);
+				vertices[++index] = y;
+				vertices[++index] = cos(phi);
+				// Textures (s, t)
+				vertices[++index] = phi/(2.0f*PI);
+				vertices[++index] = abs(y * 0.5f - 0.5f);
+
+				phi += (2.0f * PI) / (GLfloat)vertSegs;
+			}
+			phi = 0.0f;
+			theta += PI / (GLfloat)horizSegs;
+		}
+
+		phi = 0.0f;
+		// Generate vertices and normals for top circle plane (all normals should be (0.0, 1.0, 0.0))
+		for (int j = 0; j < vertSegs; ++j) {
+
+			// Vertex (x, y, z)
+			vertices[++index] = radius * sin(phi);
+			vertices[++index] = (height / 2.0f);
+			vertices[++index] = radius * cos(phi);
+			// Normal (x, y, z)
+			vertices[++index] = 0.0f;
+			vertices[++index] = 1.0f;
+			vertices[++index] = 0.0f;
+			// Textures (s, t)
+			vertices[++index] = cos(phi) * 0.5f + 0.5f;
+			vertices[++index] = sin(phi + PI) * 0.5f + 0.5f;
+
+			phi += (2.0f * PI) / (GLfloat)vertSegs;
+		}
+
+		// Top center vertex, normal and texture coordinates
+		vertices[++index] = 0.0f; vertices[++index] = (height / 2.0f); vertices[++index] = 0.0f;
+		vertices[++index] = 0.0f; vertices[++index] = 1.0f; vertices[++index] = 0.0f;
+		vertices[++index] = 0.5f; vertices[++index] = 0.5f;
+
+		/* Generate Index Array */
+		// Bottom circle plane
+		index = -1;
+		for (int i = 0; i < vertSegs; ++i) {
+
+			indices[++index] = 0;
+			if ((i + 2) <= vertSegs) {
+				indices[++index] = i + 2;
+			}
+			else {
+				indices[++index] = (i + 2) - vertSegs;
+			}
+	
+			indices[++index] = i + 1;
+		}
+
+		// Middle part
+		int v0 = vertSegs + 1;
+		for (int i = 0; i < horizSegs; i++) {
+
+			for (int j = 0; j < vertSegs - 1; ++j) {
+				// One rectangle at a time (two triangles)
+				indices[++index] = v0;
+				indices[++index] = v0 + 1;
+				indices[++index] = vertSegs + v0;
+				indices[++index] = v0 + 1;
+				indices[++index] = vertSegs + v0 + 1;
+				indices[++index] = vertSegs + v0;
+				++v0;
+			}
+			indices[++index] = v0;
+			indices[++index] = (v0 + 1) - vertSegs;
+			indices[++index] = vertSegs + v0;
+			indices[++index] = (v0 + 1) - vertSegs;
+			indices[++index] = v0 + 1;
+			indices[++index] = vertSegs + v0;
+			++v0;
+		}
+
+		// Top circle plane
+		int lastVertexIndex = numVertices - 1;
+		for (int i = 0; i < vertSegs; ++i) {
+
+			indices[++index] = lastVertexIndex;
+			if ((lastVertexIndex - 2 - i) >= lastVertexIndex - vertSegs) {
+				indices[++index] = lastVertexIndex - 2 - i;
+			}
+			else {
+				indices[++index] = lastVertexIndex - 1;
+			}
+			indices[++index] = lastVertexIndex - 1 - i;
+		}
+
+		// Generate ID's for buffers and vertex array to use in the shader
+		this->generateBuffersAndVertexArrayObject();
+
+		// Store our vertex array and index array in buffers for OpenGL to use
+		this->bindBuffersAndVertexArrayObject();
+
+		// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
+		this->configureVertexArrayAttributes();
+
+		// Deactivate (unbind) the VAO and the buffers again.
+		this->unbindBuffersAndVertexArrayObject();
+	}
+
+	void createCylinder(int vertSegs, const GLfloat &radius, const GLfloat &height) {
+
+		this->clean();
+
+		this->meshIsEmpty = false;
+
+		int horizSegs = 1;
+
+		if (vertSegs < 4) {
+			vertSegs = 4;
+		}
+
+		this->numVertices = 6 * vertSegs + 2;
+		this->numTriangles = 2 * vertSegs * (1 + horizSegs);
+
+		this->vertices = new GLfloat[numVertices * stride];
+		this->indices = new GLuint[3 * numTriangles];
+
+		// Bottom center
+		// Vertex coordinates
+		vertices[0] = 0.0f; vertices[1] = -(height / 2.0f); vertices[2] = 0.0f;
+		// Normal coordinates
+		vertices[3] = 0.0f; vertices[4] = -1.0f; vertices[5] = 0.0f;
+		// Texture coordinates
+		vertices[6] = 0.5f; vertices[7] = 0.5f;
+
+		const GLfloat PI = GLOBAL_CONSTANTS::PI;
+		// Go from bottom to top (Y € -PI < theta < PI )
+		GLfloat theta = -PI;
+		// Begin at Z = 0 (Z € 0 < phi < 2PI )
+		GLfloat phi = 0.0f;
+
+		int index = 7;
+		// Generate vertices and normals for bottom circle plane (all normals should be (0.0, -1.0, 0.0))
+		for (int j = 0; j < vertSegs; ++j) {
+
+			// Vertex (x, y, z)
+			vertices[++index] = radius * sin(phi);
+			vertices[++index] = -(height / 2.0f); // The bottom circle is on the plane y = -height/2
+			vertices[++index] = radius * cos(phi);
+			// Normal (x, y, z)
+			vertices[++index] = 0.0f;
+			vertices[++index] = -1.0f;
+			vertices[++index] = 0.0f;
+			// Textures (s, t)
+			vertices[++index] = cos(phi) * 0.5f + 0.5f;
+			vertices[++index] = sin(phi + PI) * 0.5f + 0.5f;
+
+			phi += (2.0f * PI) / (GLfloat)vertSegs;
+		}
+
+		
+		// Begin at Z = 0 (Z € 0 < phi < 2PI )
+		phi = 0.0f;
+		// Generate middle part vertices with normals (from bottom to top)
+		for (int i = 0; i < horizSegs + 1; ++i) {
+
+			GLfloat y = cos(theta);
+			// Two vertices each iteration which belong to the same face
+			for (int j = 0; j < vertSegs; ++j) {
+
+				GLfloat phiNext = phi + (2.0f * PI) / (GLfloat)vertSegs;
+				// First Vertex
+				// Vertex (x, y, z)
+				vertices[++index] = radius * sin(phi);
+				vertices[++index] = (height / 2.0f) * y;
+				vertices[++index] = radius * cos(phi);
+				// Normal (x, y, z)
+				vertices[++index] = sin(phi) + sin(phiNext);
+				vertices[++index] = y + y;
+				vertices[++index] = cos(phi) + cos(phiNext);
+				
+				// Textures (s, t)
+				vertices[++index] = phi / (2.0f*PI);
+				vertices[++index] = abs(y * 0.5f - 0.5f);
+
+				// Second Vertex
+				// Vertex (x, y, z)
+				vertices[++index] = radius * sin(phiNext);
+				vertices[++index] = (height / 2.0f) * y;
+				vertices[++index] = radius * cos(phiNext);
+				// Normal (x, y, z)
+				vertices[++index] = sin(phi) + sin(phiNext);;
+				vertices[++index] = y + y;
+				vertices[++index] = cos(phi) + cos(phiNext);
+				
+				// Textures (s, t)
+				vertices[++index] = phiNext / (2.0f*PI);
+				vertices[++index] = abs(y * 0.5f - 0.5f);
+
+				phi = phiNext;
+			}
+			vertices[index - 1] = 1.0f; // Last vertex s-texture coordinate is always 1
+
+			phi = 0.0f;
+			theta += PI / (GLfloat)horizSegs;
+		}
+
+		phi = 0.0f;
+		// Generate vertices and normals for top circle plane (all normals should be (0.0, 1.0, 0.0))
+		for (int j = 0; j < vertSegs; ++j) {
+
+			// Vertex (x, y, z)
+			vertices[++index] = radius * sin(phi);
+			vertices[++index] = (height / 2.0f);
+			vertices[++index] = radius * cos(phi);
+			// Normal (x, y, z)
+			vertices[++index] = 0.0f;
+			vertices[++index] = 1.0f;
+			vertices[++index] = 0.0f;
+			// Textures (s, t)
+			vertices[++index] = cos(phi) * 0.5f + 0.5f;
+			vertices[++index] = sin(phi + PI) * 0.5f + 0.5f;
+
+			phi += (2.0f * PI) / (GLfloat)vertSegs;
+		}
+		
+		// Top center vertex, normal and texture coordinates
+		vertices[++index] = 0.0f; vertices[++index] = (height / 2.0f); vertices[++index] = 0.0f;
+		vertices[++index] = 0.0f; vertices[++index] = 1.0f; vertices[++index] = 0.0f;
+		vertices[++index] = 0.5f; vertices[++index] = 0.5f;
+
+		/* Generate Index Array */
+		// Bottom circle plane
+		index = -1;
+		for (int i = 0; i < vertSegs; ++i) {
+
+			indices[++index] = 0;
+			if ((i + 2) <= vertSegs) {
+				indices[++index] = i + 2;
+			}
+			else {
+				indices[++index] = (i + 2) - vertSegs;
+			}
+
+			indices[++index] = i + 1;
+		}
+
+		// Middle part
+		int v0 = vertSegs + 1;
+		for (int i = 0; i < horizSegs; i++) {
+
+			for (int j = 0; j < vertSegs; ++j) {
+				// One rectangle at a time (two triangles)
+				indices[++index] = v0;
+				indices[++index] = v0 + 1;
+				indices[++index] = 2 * vertSegs + v0;
+
+				indices[++index] = v0 + 1;
+				indices[++index] = 2* vertSegs + v0 + 1;
+				indices[++index] = 2 * vertSegs + v0;
+				v0 = v0 + 2;
+			}
+		}
+
+		// Top circle plane
+		int lastVertexIndex = numVertices - 1;
+		for (int i = 0; i < vertSegs; ++i) {
+
+			indices[++index] = lastVertexIndex;
+			if ((lastVertexIndex - 2 - i) >= lastVertexIndex - vertSegs) {
+				indices[++index] = lastVertexIndex - 2 - i;
+			}
+			else {
+				indices[++index] = lastVertexIndex - 1;
+			}
+			indices[++index] = lastVertexIndex - 1 - i;
+		}
+
+		// Generate ID's for buffers and vertex array to use in the shader
+		this->generateBuffersAndVertexArrayObject();
+
+		// Store our vertex array and index array in buffers for OpenGL to use
+		this->bindBuffersAndVertexArrayObject();
+
+		// Tell OpenGL how it should interpret the vertex data (per vertex attribute)
+		this->configureVertexArrayAttributes();
+
 		// Deactivate (unbind) the VAO and the buffers again.
 		this->unbindBuffersAndVertexArrayObject();
 	}

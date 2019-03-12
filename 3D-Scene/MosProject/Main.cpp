@@ -105,6 +105,7 @@ int main()
 	GLfloat modelViewMatrix[16] = { 0 };
 	MATRIX4::identity(modelViewMatrix); // Identity matrix as default
 	mainShader.setFloatMat4("modelView", modelViewMatrix); // Insert Model View Matrix
+
 	// Perspective projection matrix
 	GLfloat perspectiveMatrix[16] = { 0 };
 	MATRIX4::perspective(perspectiveMatrix, PI / 3, (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
@@ -173,6 +174,8 @@ int main()
 	/**************/
 	Texture woodenFloorTexture("Files//Textures//wooden_floor.jpg");
 	Texture footballTexture("Files//Textures//football.jpg");
+	Texture concreteTexture("Files//Textures//concrete_wall.jpg");
+	Texture darkRockTexture("Files//Textures//dark_rock_tile.jpg");
 
 
 	/************/
@@ -203,14 +206,62 @@ int main()
 	lamp.setPosition(lightPosition[0], lightPosition[1], lightPosition[2]);
 
 	// Create a plane mesh for the floor
+	GLfloat floorDimX = 500.0f;
+	GLfloat floorDimZ = 500.0f;
+	GLfloat floorLevel = -settings.RADIUS*2.0f;
 	Mesh plane;
-	plane.createPlaneXZ(600.0f, 600.0f);
+	plane.createPlaneXZ(floorDimX, floorDimZ, 200.0f, floorDimZ);
 	// Create floor object
 	Object floor;
 	floor.setMesh(&plane);
 	floor.setTexture(&woodenFloorTexture);
-	floor.setPosition(0.0f, -settings.RADIUS*2.0f, 0.0f);
+	floor.setPosition(0.0f, floorLevel, 0.0f);
 
+	// Create cylinder for pillars
+	GLfloat pillarHeight = 100.0f;
+	GLfloat pillarRadius = 10.0f;
+	Mesh cylinder;
+	cylinder.createCylinder(8, 10.f, pillarHeight); // (Vertical segments, horizontal segments, radius, height)
+	// Create cylinder object
+	Object pillar;
+	pillar.setMesh(&cylinder);
+	pillar.setTexture(&concreteTexture);
+
+	// Create and add transformation matrices for different locations to the pillar object
+	Transform staticPose;
+	staticPose.setPosition(-(floorDimX / 2.0f) + pillarRadius, (pillarHeight / 2.0f) + floorLevel, (floorDimZ / 2.0f) - pillarRadius);
+	pillar.addStaticPose(staticPose.matrix4); // Pose 0 (lower left corner)
+
+	staticPose.setPosition((floorDimX / 2.0f) - pillarRadius, (pillarHeight / 2.0f) + floorLevel, (floorDimZ / 2.0f) - pillarRadius);
+	pillar.addStaticPose(staticPose.matrix4); // Pose 1 (lower right corner)
+
+	staticPose.setPosition(-(floorDimX / 2.0f) + pillarRadius, (pillarHeight / 2.0f) + floorLevel, -(floorDimZ / 2.0f) + pillarRadius);
+	pillar.addStaticPose(staticPose.matrix4); // Pose 2 (upper left corner)
+
+	staticPose.setPosition((floorDimX / 2.0f) - pillarRadius, (pillarHeight / 2.0f) + floorLevel, -(floorDimZ / 2.0f) + pillarRadius);
+	pillar.addStaticPose(staticPose.matrix4); // Pose 3 (upper right corner)
+
+
+	// Create side walls
+	Mesh plane2;
+	plane2.createPlaneXZ(floorDimZ, pillarHeight);
+	Object wall;
+	wall.setMesh(&plane2);
+	wall.setTexture(&darkRockTexture);
+	// Add transformation matrices
+	staticPose.setPosition(-(floorDimX / 2.0f), pillarHeight / 2.0f + floorLevel, 0.0f);
+	staticPose.setRotation(90.0f, 90.0f, 0.0f); // Rotate 90 degrees around x-axis and 90 degrees around y-axis
+	wall.addStaticPose(staticPose.matrix4); // Left side wall
+
+	staticPose.setPosition((floorDimX / 2.0f), pillarHeight / 2.0f + floorLevel, 0.0f);
+	staticPose.setRotation(90.0f, -90.0f, 0.0f); // Rotate 90 degrees around x-axis and 90 degrees around y-axis
+	wall.addStaticPose(staticPose.matrix4); // Right side wall
+
+	staticPose.setPosition(0.0f, pillarHeight / 2.0f + floorLevel, -(floorDimZ / 2.0f));
+	staticPose.setRotation(90.0f, 0.0f, 0.0f); // Rotate 90 degrees around x-axis and 90 degrees around y-axis
+	wall.addStaticPose(staticPose.matrix4); // Back wall
+
+	
 	// Create a mesh and load a prepared mesh for the bouncy ball
 	Mesh ball;
 	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
@@ -224,6 +275,7 @@ int main()
 	bouncyBall.addAnimation("BouncyBall_straight_up"); // ID: 3
 	bouncyBall.addAnimation("BouncyBall_front_right"); // ID: 4
 	
+
 	// Time variables
 	GLfloat time = (GLfloat)glfwGetTime();
 	GLfloat deltaTime = 0.0f;
@@ -249,7 +301,7 @@ int main()
 		// Update camera position in shader
 		mainShader.use();
 		mainShader.setVec3(
-			"cameraView",
+			"viewPosition",
 			camera.getPosition()[0],
 			camera.getPosition()[1],
 			camera.getPosition()[2]
@@ -270,6 +322,29 @@ int main()
 		// Draw floor
 		floor.render(&mainShader);
 
+		// Draw pillars
+		pillar.useStaticPose(0);
+		pillar.render(&mainShader);
+
+		pillar.useStaticPose(1);
+		pillar.render(&mainShader);
+
+		pillar.useStaticPose(2);
+		pillar.render(&mainShader);
+
+		pillar.useStaticPose(3);
+		pillar.render(&mainShader);
+
+		// Draw walls
+		wall.useStaticPose(0);
+		wall.render(&mainShader);
+
+		wall.useStaticPose(1);
+		wall.render(&mainShader);
+
+		wall.useStaticPose(2);
+		wall.render(&mainShader);
+		
 		// Draw bouncy balls
 		// Animation 0
 		bouncyBall.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
@@ -302,7 +377,9 @@ int main()
 		bouncyBall.update(); // Update animation
 		bouncyBall.render(&mainShader); // Draw
 
-		/*
+
+		// DRAW SIMULATION 
+		/* 
 		footballTexture.use();
 		// Place sphere infront of the camera
 		MATRIX4::translate(modelViewMatrix, 0.0f, 0.0f, -50.0f);
