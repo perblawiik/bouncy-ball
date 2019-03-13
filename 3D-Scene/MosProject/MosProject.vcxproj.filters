@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{ade438b0-de07-4b35-8b44-7413d1c9156a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -56,13 +59,28 @@
     <ClInclude Include="Object.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Canvas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\fragment.glsl" />
-    <None Include="Shaders\vertex.glsl" />
-    <None Include="Shaders\lampFrag.glsl" />
-    <None Include="Shaders\lampVert.glsl" />
-    <None Include="Shaders\depthMapFrag.glsl" />
-    <None Include="Shaders\depthMapVert.glsl" />
+    <None Include="Shaders\lampShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\lampShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\mainShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\mainShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\loadingScreenShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\loadingScreenShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

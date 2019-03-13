@@ -11,6 +11,7 @@
 #include "CameraController.h"
 #include "Texture.h"
 #include "Object.h"
+#include "Canvas.h"
 
 #include <iostream>
 #include <fstream>
@@ -19,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <thread> 
 
 /** CONSTANTS **/
 const GLfloat PI = GLOBAL_CONSTANTS::PI;
@@ -37,6 +39,9 @@ void createSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE
 void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody);
 // Save simulation data to a text file
 void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings, const std::string &simulationName);
+
+// Load animations (used for multithreading)
+void loadAnimationsFromFile(Object &bouncyBalls, bool &loadingComplete);
 
 
 int main() 
@@ -97,7 +102,7 @@ int main()
 	/** SHADERS **/
 	/*************/
 	// Create our main shader (responsible for all the lighting in the scene)
-	Shader mainShader("Shaders//vertex.glsl", "Shaders//fragment.glsl");
+	Shader mainShader("Shaders//mainShader.vert", "Shaders//mainShader.frag");
 	// Activate shader
 	mainShader.use();
 
@@ -112,7 +117,7 @@ int main()
 	mainShader.setFloatMat4("perspective", perspectiveMatrix); // Insert Projection Matrix
 
 	// Lamp shader
-	Shader lampShader("Shaders//lampVert.glsl", "Shaders//lampFrag.glsl");
+	Shader lampShader("Shaders//lampShader.vert", "Shaders//lampShader.frag");
 	lampShader.use();
 	lampShader.setFloatMat4("perspective", perspectiveMatrix); // Set perspective projection matrix
 
@@ -130,6 +135,10 @@ int main()
 	mainShader.use();
 	mainShader.setVec3("lightPosition", lightPosition[0], lightPosition[1], lightPosition[2]);
 	mainShader.setVec3("lightColor", lightColor[0], lightColor[1], lightColor[2]);
+
+
+	// Simple loading screen shaders
+	Shader loadingShader("Shaders//loadingScreenShader.vert", "Shaders//loadingScreenShader.frag");
 
 
 	/****************/
@@ -261,19 +270,42 @@ int main()
 	staticPose.setRotation(90.0f, 0.0f, 0.0f); // Rotate 90 degrees around x-axis and 90 degrees around y-axis
 	wall.addStaticPose(staticPose.matrix4); // Back wall
 
-	
+	// Create loading screen
+	Canvas loadingMessage(&width, &height);
+	loadingMessage.createRectangle(500, 40);
+	Texture text("Files//Textures//text.png");
+	loadingMessage.setTexture(&text);
+	loadingMessage.setPosition(0.0f, 100.0f, 0.0f);
+
+	Canvas loadingCycle(&width, &height);
+	loadingCycle.createRectangle(100, 100);
+	Texture cycle("Files//Textures//cycle.png");
+	loadingCycle.setTexture(&cycle);
+	loadingCycle.setPosition(0.0f, -200.0f, 0.0f);
+
 	// Create a mesh and load a prepared mesh for the bouncy ball
 	Mesh ball;
 	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
 	// Create bouncy ball object
-	Object bouncyBall;
-	bouncyBall.setMesh(&ball);
-	bouncyBall.setTexture(&footballTexture);
-	bouncyBall.addAnimation("BouncyBall_back_left"); // ID: 0
-	bouncyBall.addAnimation("BouncyBall_back_right"); // ID: 1
-	bouncyBall.addAnimation("BouncyBall_front_left"); // ID: 2
-	bouncyBall.addAnimation("BouncyBall_straight_up"); // ID: 3
-	bouncyBall.addAnimation("BouncyBall_front_right"); // ID: 4
+	Object bouncyBalls;
+	bouncyBalls.setMesh(&ball);
+	bouncyBalls.setTexture(&footballTexture);
+
+	bool loadingComplete = false;
+	std::thread loadingThread(loadAnimationsFromFile, std::ref(bouncyBalls), std::ref(loadingComplete));
+
+	while (!loadingComplete) {
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear
+		loadingMessage.render(&loadingShader); // Draw
+		loadingCycle.render(&loadingShader);
+		glfwSwapBuffers(window);// Swap buffers
+		glfwPollEvents();
+	}
+
+	loadingThread.join();
+
+	// Add animations
+	//loadAnimationsFromFile(bouncyBalls);
 	
 
 	// Time variables
@@ -314,7 +346,7 @@ int main()
 
 		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
+
 
 		// Draw lamp
 		lamp.render(&lampShader);
@@ -347,35 +379,35 @@ int main()
 		
 		// Draw bouncy balls
 		// Animation 0
-		bouncyBall.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
-		bouncyBall.setPosition(-settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
-		bouncyBall.startAnimation(0);
-		bouncyBall.update(); // Update animation
-		bouncyBall.render(&mainShader); // Draw
+		bouncyBalls.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
+		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
+		bouncyBalls.startAnimation(0);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
 		// Animation 1
-		bouncyBall.setColor(1.0f, 0.0f, 1.0f); // Set color to Magenta
-		bouncyBall.setPosition(settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
-		bouncyBall.startAnimation(1);
-		bouncyBall.update(); // Update animation
-		bouncyBall.render(&mainShader); // Draw
+		bouncyBalls.setColor(1.0f, 0.0f, 1.0f); // Set color to Magenta
+		bouncyBalls.setPosition(settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
+		bouncyBalls.startAnimation(1);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
 		// Animation 2
-		bouncyBall.setColor(1.0f, 0.5f, 0.0f); // Set color to Orange
-		bouncyBall.setPosition(-settings.RADIUS*2.0f, 0.0f, 0.0f);
-		bouncyBall.startAnimation(2);
-		bouncyBall.update(); // Update animation
-		bouncyBall.render(&mainShader); // Draw
+		bouncyBalls.setColor(1.0f, 0.5f, 0.0f); // Set color to Orange
+		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, 0.0f);
+		bouncyBalls.startAnimation(2);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
 		// Animation 3
-		bouncyBall.setColor(0.0f, 1.0f, 1.0f); // Set color to Cyan
-		bouncyBall.setPosition(0.0f, 0.0f, 0.0f);
-		bouncyBall.startAnimation(3);
-		bouncyBall.update(); // Update animation
-		bouncyBall.render(&mainShader); // Draw
+		bouncyBalls.setColor(0.0f, 1.0f, 1.0f); // Set color to Cyan
+		bouncyBalls.setPosition(0.0f, 0.0f, 0.0f);
+		bouncyBalls.startAnimation(3);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
 		// Animation 4
-		bouncyBall.setColor(1.0f, 1.0f, 1.0f); // Set color to White
-		bouncyBall.setPosition(settings.RADIUS*2.0f, 0.0f, 0.0f);
-		bouncyBall.startAnimation(4);
-		bouncyBall.update(); // Update animation
-		bouncyBall.render(&mainShader); // Draw
+		bouncyBalls.setColor(1.0f, 1.0f, 1.0f); // Set color to White
+		bouncyBalls.setPosition(settings.RADIUS*2.0f, 0.0f, 0.0f);
+		bouncyBalls.startAnimation(4);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
 
 
 		// DRAW SIMULATION 
@@ -593,4 +625,14 @@ void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint
 	if (cameraPos == -1) {
 		std::cout << " Unable to locate variable 'viewPosition' in shader !" << std::endl;
 	}
+}
+
+void loadAnimationsFromFile(Object &bouncyBalls, bool &loadingComplete)
+{
+	bouncyBalls.addAnimation("BouncyBall_back_left"); // ID: 0
+	bouncyBalls.addAnimation("BouncyBall_back_right"); // ID: 1
+	bouncyBalls.addAnimation("BouncyBall_front_left"); // ID: 2
+	bouncyBalls.addAnimation("BouncyBall_straight_up"); // ID: 3
+	bouncyBalls.addAnimation("BouncyBall_front_right"); // ID: 4
+	loadingComplete = true;
 }

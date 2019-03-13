@@ -146,6 +146,7 @@
     <ClInclude Include="Animation.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraController.h" />
+    <ClInclude Include="Canvas.h" />
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Object.h" />
@@ -157,12 +158,12 @@
     <ClInclude Include="Transform.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\depthMapFrag.glsl" />
-    <None Include="Shaders\depthMapVert.glsl" />
-    <None Include="Shaders\fragment.glsl" />
-    <None Include="Shaders\lampFrag.glsl" />
-    <None Include="Shaders\lampVert.glsl" />
-    <None Include="Shaders\vertex.glsl" />
+    <None Include="Shaders\lampShader.frag" />
+    <None Include="Shaders\lampShader.vert" />
+    <None Include="Shaders\loadingScreenShader.frag" />
+    <None Include="Shaders\loadingScreenShader.vert" />
+    <None Include="Shaders\mainShader.frag" />
+    <None Include="Shaders\mainShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
