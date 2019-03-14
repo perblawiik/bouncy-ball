@@ -190,6 +190,23 @@ public:
 		}
 	}
 
+	void renderStaticPoses(Shader* shader)
+	{
+		if (texture)
+		{
+			texture->use();
+		}
+		if (mesh)
+		{
+			shader->setFloat3("objectColor", color);
+
+			for (unsigned int i = 0; i < staticPoses.size(); ++i) {
+				shader->setFloatMat4("modelView", staticPoses[i]);
+				mesh->render();
+			}
+		}
+	}
+
 private:
 
 	Mesh* mesh;

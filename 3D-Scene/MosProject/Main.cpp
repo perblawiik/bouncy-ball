@@ -123,7 +123,7 @@ int main()
 
 	// Position of the lamp
 	GLfloat lightPosition[] = {
-		0.0f, 75.0f, 0.0f
+		0.0f, 80.0f, 0.0f
 	};
 
 	// Light color of the lamp
@@ -156,7 +156,6 @@ int main()
 	settings.TIME_DURATION = 10.0f; // Specifies how long the simulation should be (given in seconds)
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	settings.NUM_SEGS = 16; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
-	std::cout << "Number of simulation steps: " << settings.NUM_STEPS << std::endl;
 	/*
 	// Create a sphere mesh (for the softbody)
 	Mesh sphere;
@@ -184,7 +183,8 @@ int main()
 	Texture woodenFloorTexture("Files//Textures//wooden_floor.jpg");
 	Texture footballTexture("Files//Textures//football.jpg");
 	Texture concreteTexture("Files//Textures//concrete_wall.jpg");
-	Texture darkRockTexture("Files//Textures//dark_rock_tile.jpg");
+	Texture bricksTexture("Files//Textures//bricks.jpg");
+	Texture whiteWallTexture("Files//Textures//ceiling.jpg");
 
 
 	/************/
@@ -214,10 +214,10 @@ int main()
 	lamp.setColor(lightColor[0], lightColor[1], lightColor[2]);
 	lamp.setPosition(lightPosition[0], lightPosition[1], lightPosition[2]);
 
-	// Create a plane mesh for the floor
+	// Create a plane mesh for the floor and the ceiling
 	GLfloat floorDimX = 500.0f;
 	GLfloat floorDimZ = 500.0f;
-	GLfloat floorLevel = -settings.RADIUS*2.0f;
+	GLfloat floorLevel = -settings.RADIUS * 2.0f;
 	Mesh plane;
 	plane.createPlaneXZ(floorDimX, floorDimZ, 200.0f, floorDimZ);
 	// Create floor object
@@ -226,8 +226,16 @@ int main()
 	floor.setTexture(&woodenFloorTexture);
 	floor.setPosition(0.0f, floorLevel, 0.0f);
 
+	// Create roof object
+	GLfloat ceilingLevel = lightPosition[1] + 10.0f; // Set ceiling level at the lamp position + lamp radius
+	Object ceiling;
+	ceiling.setMesh(&plane);
+	ceiling.setTexture(&whiteWallTexture);
+	ceiling.setPosition(0.0f, ceilingLevel, 0.0f);
+	ceiling.setRotation(180.0f, 0.0f, 0.0f); // Rotate 180 degrees around x-axis
+
 	// Create cylinder for pillars
-	GLfloat pillarHeight = 100.0f;
+	GLfloat pillarHeight = ceilingLevel - floorLevel;
 	GLfloat pillarRadius = 10.0f;
 	Mesh cylinder;
 	cylinder.createCylinder(8, 10.f, pillarHeight); // (Vertical segments, horizontal segments, radius, height)
@@ -253,11 +261,12 @@ int main()
 
 	// Create side walls
 	Mesh plane2;
-	plane2.createPlaneXZ(floorDimZ, pillarHeight);
+	plane2.createPlaneXZ(floorDimZ, pillarHeight, pillarHeight, pillarHeight);
 	Object wall;
 	wall.setMesh(&plane2);
-	wall.setTexture(&darkRockTexture);
-	// Add transformation matrices
+	wall.setTexture(&bricksTexture);
+
+	// Add several transformation matrices for the same object
 	staticPose.setPosition(-(floorDimX / 2.0f), pillarHeight / 2.0f + floorLevel, 0.0f);
 	staticPose.setRotation(90.0f, 90.0f, 0.0f); // Rotate 90 degrees around x-axis and 90 degrees around y-axis
 	wall.addStaticPose(staticPose.matrix4); // Left side wall
@@ -270,6 +279,7 @@ int main()
 	staticPose.setRotation(90.0f, 0.0f, 0.0f); // Rotate 90 degrees around x-axis and 90 degrees around y-axis
 	wall.addStaticPose(staticPose.matrix4); // Back wall
 
+
 	// Create loading screen
 	Canvas loadingMessage(&width, &height);
 	loadingMessage.createRectangle(500, 40);
@@ -277,21 +287,28 @@ int main()
 	loadingMessage.setTexture(&text);
 	loadingMessage.setPosition(0.0f, 100.0f, 0.0f);
 
-	Canvas loadingCycle(&width, &height);
-	loadingCycle.createRectangle(100, 100);
-	Texture cycle("Files//Textures//loading_symbol.png");
-	loadingCycle.setTexture(&cycle);
-	loadingCycle.setPosition(0.0f, -200.0f, 0.0f);
-	loadingCycle.useRotationAnimation(&loadingShader, true);
+	Canvas loadingSymbol(&width, &height);
+	loadingSymbol.createRectangle(100, 100);
+	Texture gear("Files//Textures//gear.png");
+	loadingSymbol.setTexture(&gear);
+	loadingSymbol.setPosition(95.0f, -200.0f, 0.0f);
+	loadingSymbol.useRotationAnimation(&loadingShader, true);
+
+	Canvas loadingSymbol2(&width, &height);
+	loadingSymbol2.createRectangle(80, 80);
+	Texture gear2("Files//Textures//gear2.png");
+	loadingSymbol2.setTexture(&gear2);
+	loadingSymbol2.setPosition(-95.0f, -200.0f, 0.0f);
+	loadingSymbol2.useRotationAnimation(&loadingShader, true);
 
 	// Create a mesh and load a prepared mesh for the bouncy ball
 	Mesh ball;
-	ball.loadMeshData("BouncyBall_back_left"); // All animations have the same mesh data
+	ball.loadMeshData("BouncyBall"); // All animations have the same mesh data
 	// Create bouncy ball object
 	Object bouncyBalls;
 	bouncyBalls.setMesh(&ball);
 	bouncyBalls.setTexture(&footballTexture);
-
+	
 	// Load animations from files with a separated thread
 	bool loadingComplete = false;
 	std::thread loadingThread(loadAnimationsFromFile, std::ref(bouncyBalls), std::ref(loadingComplete));
@@ -304,10 +321,15 @@ int main()
 		time = (GLfloat)glfwGetTime();
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear
-		loadingShader.use();
-		loadingShader.setFloat("time", -2.0f * time);
 		loadingMessage.render(&loadingShader); // Draw
-		loadingCycle.render(&loadingShader); // Draw
+
+		// Large gear
+		loadingShader.setFloat("time", -time);
+		loadingSymbol.render(&loadingShader); // Draw
+
+		// Small gear
+		loadingShader.setFloat("time", time);
+		loadingSymbol2.render(&loadingShader); // Draw
 
 		glfwSwapBuffers(window);// Swap buffers
 		glfwPollEvents();
@@ -315,7 +337,7 @@ int main()
 
 	// Synchronize threads before moving on
 	loadingThread.join();
-
+	
 	// Time variables
 	time = (GLfloat)glfwGetTime();
 	GLfloat deltaTime = 0.0f;
@@ -362,28 +384,15 @@ int main()
 		// Draw floor
 		floor.render(&mainShader);
 
+		// Draw roof
+		ceiling.render(&mainShader);
+
 		// Draw pillars
-		pillar.useStaticPose(0);
-		pillar.render(&mainShader);
-
-		pillar.useStaticPose(1);
-		pillar.render(&mainShader);
-
-		pillar.useStaticPose(2);
-		pillar.render(&mainShader);
-
-		pillar.useStaticPose(3);
-		pillar.render(&mainShader);
+		pillar.renderStaticPoses(&mainShader);
 
 		// Draw walls
-		wall.useStaticPose(0);
-		wall.render(&mainShader);
-
-		wall.useStaticPose(1);
-		wall.render(&mainShader);
-
-		wall.useStaticPose(2);
-		wall.render(&mainShader);
+		wall.renderStaticPoses(&mainShader);
+		
 		
 		// Draw bouncy balls
 		// Animation 0
@@ -412,14 +421,14 @@ int main()
 		bouncyBalls.render(&mainShader); // Draw
 		// Animation 4
 		bouncyBalls.setColor(1.0f, 1.0f, 1.0f); // Set color to White
-		bouncyBalls.setPosition(settings.RADIUS*2.0f, 0.0f, 0.0f);
+		bouncyBalls.setPosition((floorDimX / 2.0f) - (settings.RADIUS * 4.0f), 0.0f, 0.0f);
 		bouncyBalls.startAnimation(4);
 		bouncyBalls.update(); // Update animation
 		bouncyBalls.render(&mainShader); // Draw
+		
 
-
+		/*
 		// DRAW SIMULATION 
-		/* 
 		footballTexture.use();
 		// Place sphere infront of the camera
 		MATRIX4::translate(modelViewMatrix, 0.0f, 0.0f, -50.0f);

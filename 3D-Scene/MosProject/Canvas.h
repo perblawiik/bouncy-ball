@@ -33,6 +33,9 @@ public:
 			delete[] indices;
 			indices = nullptr;
 		}
+
+		delete[] position;
+		position = nullptr;
 	}
 
 	void createRectangle(const int xDim, const int yDim)
