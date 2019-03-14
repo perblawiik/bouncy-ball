@@ -1,4 +1,2 @@
-# bouncy-ball
-Modelling project
-
-Soft body simulation
+# Bouncy Ball
+A soft body simulation project
