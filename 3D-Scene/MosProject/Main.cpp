@@ -279,9 +279,10 @@ int main()
 
 	Canvas loadingCycle(&width, &height);
 	loadingCycle.createRectangle(100, 100);
-	Texture cycle("Files//Textures//cycle.png");
+	Texture cycle("Files//Textures//loading_symbol.png");
 	loadingCycle.setTexture(&cycle);
 	loadingCycle.setPosition(0.0f, -200.0f, 0.0f);
+	loadingCycle.useRotationAnimation(&loadingShader, true);
 
 	// Create a mesh and load a prepared mesh for the bouncy ball
 	Mesh ball;
@@ -291,25 +292,32 @@ int main()
 	bouncyBalls.setMesh(&ball);
 	bouncyBalls.setTexture(&footballTexture);
 
+	// Load animations from files with a separated thread
 	bool loadingComplete = false;
 	std::thread loadingThread(loadAnimationsFromFile, std::ref(bouncyBalls), std::ref(loadingComplete));
 
+	GLfloat time = (GLfloat)glfwGetTime();
+
+	// While animations are loading, display a loading screen
 	while (!loadingComplete) {
+
+		time = (GLfloat)glfwGetTime();
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear
+		loadingShader.use();
+		loadingShader.setFloat("time", -2.0f * time);
 		loadingMessage.render(&loadingShader); // Draw
-		loadingCycle.render(&loadingShader);
+		loadingCycle.render(&loadingShader); // Draw
+
 		glfwSwapBuffers(window);// Swap buffers
 		glfwPollEvents();
 	}
 
+	// Synchronize threads before moving on
 	loadingThread.join();
 
-	// Add animations
-	//loadAnimationsFromFile(bouncyBalls);
-	
-
 	// Time variables
-	GLfloat time = (GLfloat)glfwGetTime();
+	time = (GLfloat)glfwGetTime();
 	GLfloat deltaTime = 0.0f;
 
 	// Counter to keep track of which simulation step to render

@@ -13,7 +13,12 @@ class Canvas
 public:
 
 	Canvas(int* width, int* height)
-		: windowWidth(width), windowHeight(height), VAO(0), VBO(0), EBO(0), vertices(nullptr), indices(nullptr), numVertices(0), numTriangles(0), empty(true), texture(nullptr), position(new GLfloat[3])
+		: windowWidth(width), windowHeight(height), 
+		VAO(0), VBO(0), EBO(0), 
+		vertices(nullptr), indices(nullptr), 
+		numVertices(0), numTriangles(0), 
+		empty(true), rotationIsActive(false),
+		texture(nullptr), position(new GLfloat[3])
 	{
 		position[0] = 0.0f; position[1] = 0.0f; position[2] = 0.0f;
 	}
@@ -110,6 +115,11 @@ public:
 		position[2] = z;
 	}
 
+	void useRotationAnimation(Shader *shader, bool flag)
+	{
+		rotationIsActive = flag;
+	}
+
 	void render(Shader *shader)
 	{
 		if (!empty) {
@@ -120,6 +130,7 @@ public:
 				texture->use();
 			}
 
+			shader->setBool("quadShouldRotate", rotationIsActive);
 			shader->setVec3("translation", position[0], position[1], position[2]);
 
 			glBindVertexArray(VAO); // Bind the VAO
@@ -144,6 +155,7 @@ private:
 	int numTriangles;
 
 	bool empty;
+	bool rotationIsActive;
 
 	Texture* texture;
 	GLfloat* position;
