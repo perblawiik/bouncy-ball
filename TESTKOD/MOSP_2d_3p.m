@@ -2,11 +2,11 @@ clear;
 
 % CONSTANTS
     % time between each approximation
-h = 0.01;
+h = 0.001;
     % spring constant
-k = 50;
+k = 5;
     % resistativitation constant
-b = 5;
+b = 0.01;
     % gravitational constant
 g = 9.8;
     % Floor bounciness multiplier (0-1 preferably :3)
@@ -15,15 +15,23 @@ fBounce = 0;
 % PARTICLES AND SPRINGS
 % ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
     % masses [m]/ per particle
-m = [1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1;];
-    % particle x, y Pos [Xx Xy] / per particle
-X = [20 10; 24 11; 26 13; 27 17; 26 21; 24 23; 20 24; 16 23; 14 21; 13 17; 14 13; 16 11; 20 17];
-    % particle indices for spring bonds [i1 i2]/ per spring
-I = [1 2; 2 3; 3 4; 4 5; 5 6; 6 7; 7 8; 8 9; 9 10; 10 11; 11 12; 12 1;
-     1 13; 2 13; 3 13; 4 13; 5 13; 6 13; 7 13; 8 13; 9 13; 10 13; 11 13; 12 13;]; 
- 
-BONDS = size(I,1);
+X = [0 40]+[1*cos((0:pi/20:2*pi-pi/20)') 1*sin((0:pi/20:2*pi-pi/20)')];
 POINTS = size(X,1);
+
+M = 1;
+m = ones(POINTS)*M/POINTS;
+
+    % particle indices for spring bonds [i1 i2]/ per spring
+% Bonds in a circle, 1-2, 2-3, 3-4, 4-1
+count = 1;
+for i = 1:POINTS
+    for j = i+1:POINTS
+        I(count,:) = [i j];
+        count = count + 1;
+    end
+end
+I(POINTS,:) = [POINTS 1];
+BONDS = size(I,1);
 
 NORM = zeros(size(X));
 for p = 1:12
@@ -37,7 +45,6 @@ end
     % starting velocity [Vx Vy]/ per particle
 V = zeros(POINTS,2);
 % ***V(index,:) = [a b]; for initial velocities***
-    % V'
 Vp = zeros(POINTS,2);
     % Fk spring starting force [F]/ per spring  (applied directionally later, depending on spring orientation)
 Fk = zeros(BONDS,2);               
@@ -46,7 +53,7 @@ Fkp = zeros(BONDS,2);
 
 % SIMULATION
     % how many animation frames
-CYCLES = 5000;
+CYCLES = 10000;
     % where the particle animation positions are stored
 animation = zeros(POINTS,2,CYCLES); animation(:,:,1) = X;
 for cycle=1:CYCLES -1    
@@ -82,34 +89,29 @@ for cycle=1:CYCLES -1
     X(:,2) = (X(:,2)>0).*X(:,2);
     
     animation(:,:,cycle + 1) = X;
+    cycle
 end
-
+%%
 % ANIMATION
 % Stop the animation by pressing CTRL + C in the command window
-for i = 1:CYCLES
+i = 1;
+while(i<CYCLES)
+    c = clock;
     clf;
     hold on;
-    plot([-50 50], [0 0]); 
-    plot(animation(:,1,i),animation(:,2,i),'ro')
-    for p = 1:12
-        in1 = animation(p,:,i)-animation(mod(p-2,12)+1,:,i);
-        in2 = animation(p,:,i)-animation(mod(p,12)+1,:,i);
-        normDir = in1/norm(in1)+in2/norm(in2);
-        if(abs(norm(normDir))>.001)
-            NORM(p,:) = sign(dot(NORM(p,:),normDir))*normDir/norm(normDir);
-        end
+    line([-50 50], [0 0],'Color','black'); 
+
+    for n = 1:POINTS 
+        line([animation(:,1,i)' animation(1,1,i)],[animation(:,2,i)' animation(1,2,i)],'Color','Blue');
     end
-    for n = 1:BONDS 
-        plot([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)],'b--');
-    end
-    for n = 1:12 
-        plot([animation(n,1,i) animation(n,1,i)+10*NORM(n,1)],[animation(n,2,i) animation(n,2,i)+10*NORM(n,2)],'g');
-    end
-    xlim([-15 40]);
-    ylim([-5 40]);
+
+    xlim([-10 10]);
+    ylim([-2 18]);
     
     % used to set frame time but drawing takes time so it's not accurate
-    pause(h); 
+    pause(0);
+    cnow= clock;
+    i= i + floor((cnow(6)-c(6))/h * 0.1);
 end
 
 
