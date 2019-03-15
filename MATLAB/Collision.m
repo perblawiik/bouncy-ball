@@ -1,29 +1,44 @@
 clear;
+close all;
 
 % CONSTANTS
     % time between each approximation
 h = 0.01;
     % spring constant
-k = 200;
+k = 20;
     % resistativitation constant
-b = 5;
+b = 1;
     % gravitational constant
-g = 20;
-    % Floor bounciness multiplier (0-1 preferably :3)
-fBounce = 0.5; 
+g = 9.8;
+    % Floor bounciness multiplier (0-1 preferably)
+fBounce = 0;
 
 % PARTICLES AND SPRINGS
 % ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
-    % masses [m]/ per particle
-m = [1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1;];
     % particle x, y Pos [Xx Xy] / per particle
-X = [20 10; 24 11; 26 13; 27 17; 26 21; 24 23; 20 24; 16 23; 14 21; 13 17; 14 13; 16 11; 20 17];
-    % particle indices for spring bonds [i1 i2]/ per spring
-I = [1 2; 2 3; 3 4; 4 5; 5 6; 6 7; 7 8; 8 9; 9 10; 10 11; 11 12; 12 1;
-     1 13; 2 13; 3 13; 4 13; 5 13; 6 13; 7 13; 8 13; 9 13; 10 13; 11 13; 12 13;]; 
-
-BONDS = size(I,1);
+r = 8;
+seg = 10;
+center = [20 30];
+X = center + [r*cos(0:2*pi/seg:2*pi*(1-1/seg))' r*sin(0:2*pi/seg:2*pi*(1-1/seg))'];
+X = cat(1, X, center);
 POINTS = size(X,1);
+
+    % masses [m]/ per particle
+m_tot = 1;
+m = ones(POINTS,1)*m_tot/POINTS;
+
+    % particle indices for spring bonds [i1 i2]/ per spring
+I = zeros(2*seg,2);
+% Bonds along the circumference
+for i = 1:seg-1
+   I(i,:) = [i i+1];
+end
+I(seg,:) = [1 seg];
+% Bonds to the center point
+for i = 1:seg
+   I(seg + i,:) = [i seg+1];
+end
+BONDS = size(I,1);
 
 % DEFINING S.S.VARIABLES, STARTING VALUES
     % starting velocity [Vx Vy]/ per particle
@@ -50,8 +65,8 @@ for cycle=1:CYCLES -1
        dV = dot(V(I(n,1),:)-V(I(n,2),:),nDif);      % Gets deltaV, speed difference between the particles in the spring's direction
        Vp(I(n,1),:) = Vp(I(n,1),:) - 1/m(I(n,1)) * (b*dV + Fk(n))*nDif;     % apply spring influence to the connected particles
        Vp(I(n,2),:) = Vp(I(n,2),:) + 1/m(I(n,2)) * (b*dV + Fk(n))*nDif;     % first one's added, second is subtracted, in the springs direction since they will be either
-                                                                            % both pulled towards eachother or drawn away from eachother 
-       Fkp(n) = k * dV;     % the derivative for Fk...
+       Fkp(n) = k * dV;
+                                                                         % both pulled towards eachother or drawn away from eachother 
     end
     Vp = Vp - [0 g];    % gravity is added for all points
     
