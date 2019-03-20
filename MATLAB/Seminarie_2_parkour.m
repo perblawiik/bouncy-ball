@@ -16,7 +16,7 @@ fBounce = 0;
 % PARTICLES AND SPRINGS
 % ***DEFINING m,X,I IS ENOUGH FOR THE CODE TO RUN, THE REST IS ADAPTIVE TO THIS***
     % particle x, y Pos [Xx Xy] / per particle
-r = 8;
+r = 6;
 seg = 10;
 center = [20 30];
 X = center + [r*cos(0:2*pi/seg:2*pi*(1-1/seg))' r*sin(0:2*pi/seg:2*pi*(1-1/seg))'];
@@ -140,11 +140,9 @@ for i = 1:3:CYCLES
 %     plot([10 50], [0 40]);
 %     plot([-20 10], [10 -20]); 
 %     
-%     for n = 1:BONDS 
-%         line([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)]);
-%     end
-    line([animation(:,1,i);animation(1,1,i)],[animation(:,2,i);animation(1,2,i)],'Color','black');
-    
+    for n = 1:BONDS 
+        line([animation(I(n,1),1,i) animation(I(n,2),1,i)],[animation(I(n,1),2,i) animation(I(n,2),2,i)]);
+    end
     xlim([-50 50]);
     ylim([-50 50]);
     
