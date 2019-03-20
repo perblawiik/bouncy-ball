@@ -156,18 +156,19 @@ int main()
 	settings.TIME_DURATION = 10.0f; // Specifies how long the simulation should be (given in seconds)
 	settings.NUM_STEPS = (int)(settings.TIME_DURATION / settings.h); // Specifies how many steps the simulation will be calculated
 	settings.NUM_SEGS = 16; // Horizontal segments for the sphere (number of vertical segments are always twice the number of horizontal segments)
+	
 	/*
 	// Create a sphere mesh (for the softbody)
 	Mesh sphere;
 	sphere.createSphere(settings.NUM_SEGS, settings.RADIUS);
-
+	
 	// The bouncy ball is a softbody simulation
 	SoftBody bouncyBall;
 	// Set the mesh of our softbody to the sphere created earlier
 	bouncyBall.setMesh(&sphere);
 	// Set up all the matrices needed for the simulation
 	bouncyBall.setupSimulationModel(settings, settings.RADIUS);
-
+	
 	// A matrix to store all simulation cycles in
 	Matrix PARTICLE_POSITION_DATA(settings.NUM_STEPS, settings.NUM_POINTS*6);
 	// Compute the entire simulation with specified number of steps
@@ -181,7 +182,7 @@ int main()
 	/** TEXTURES **/
 	/**************/
 	Texture woodenFloorTexture("Files//Textures//wooden_floor.jpg");
-	Texture footballTexture("Files//Textures//football.jpg");
+	Texture stripeTexture("Files//Textures//stripes.png");
 	Texture concreteTexture("Files//Textures//concrete_wall.jpg");
 	Texture bricksTexture("Files//Textures//bricks.jpg");
 	Texture whiteWallTexture("Files//Textures//ceiling.jpg");
@@ -307,7 +308,7 @@ int main()
 	// Create bouncy ball object
 	Object bouncyBalls;
 	bouncyBalls.setMesh(&ball);
-	bouncyBalls.setTexture(&footballTexture);
+	bouncyBalls.setTexture(&stripeTexture);
 	
 	// Load animations from files with a separated thread
 	bool loadingComplete = false;
