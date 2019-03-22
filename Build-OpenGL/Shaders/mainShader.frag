@@ -34,7 +34,7 @@ void main()
 
 	// Calculate the intensity decrement
 	float dist = distance(lightPosition, FragPosition);
-	float intensity = min(80.0 / dist, 1.0);
+	float intensity = min(100.0 / dist, 1.0);
 
 	// Phong lighting model
 	vec3 phong = (ambient + diffuse + specular) * objectColor * intensity;
