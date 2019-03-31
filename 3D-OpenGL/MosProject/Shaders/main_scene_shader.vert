@@ -10,11 +10,12 @@ uniform float time;
 uniform mat4 perspective; // Projection Matrix
 uniform mat4 modelView; // Model View Matrix
 uniform mat4 cameraView; // Camera View Matrix
+uniform mat4 lightSpaceMatrix;
 
 out vec2 TexCoords;
 out vec3 Normal;
 out vec3 FragPosition;
-
+out vec4 FragPosLightSpace;
 
 void main()
 {
@@ -26,4 +27,5 @@ void main()
 	Normal = normalize(mat3(modelView)*aNormal);
 	TexCoords = aTexCoords;
 	FragPosition = vec3(modelView * vec4(aPosition, 1.0));
+	FragPosLightSpace = lightSpaceMatrix * vec4(FragPosition, 1.0);
 }

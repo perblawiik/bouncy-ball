@@ -172,8 +172,18 @@ struct MATRIX4
 
 		M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;                              M[12] = 0.0f;
 		M[1] = 0.0f;       M[5] = f;    M[9] = 0.0f;                              M[13] = 0.0f;
-		M[2] = 0.0f;       M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2 * zNear*zFar) / (zFar - zNear);
+		M[2] = 0.0f;       M[6] = 0.0f; M[10] = -(zFar + zNear) / (zFar - zNear); M[14] = -(2.0f * zNear*zFar) / (zFar - zNear);
 		M[3] = 0.0f;       M[7] = 0.0f; M[11] = -1.0f;                            M[15] = 0.0f;
+	}
+
+	static void perspectiveInfinite(GLfloat M[], const GLfloat &vertFov, const GLfloat &aspect, const GLfloat &zNear)
+	{
+		GLfloat f = cos(vertFov / 2) / sin(vertFov / 2);
+
+		M[0] = f / aspect; M[4] = 0.0f; M[8] = 0.0f;   M[12] = 0.0f;
+		M[1] = 0.0f;       M[5] = f;    M[9] = 0.0f;   M[13] = 0.0f;
+		M[2] = 0.0f;       M[6] = 0.0f; M[10] = -1.0f; M[14] = -(2.0f * zNear);
+		M[3] = 0.0f;       M[7] = 0.0f; M[11] = -1.0f; M[15] = 0.0f;
 	}
 
 	// Generates an orthogonal projection matrix

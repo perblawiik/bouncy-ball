@@ -105,6 +105,11 @@ public:
 		return transform->position;
 	}
 
+	Transform* getTransform()
+	{
+		return transform;
+	}
+
 private:
 	Transform* transform;
 	std::vector<Shader*> shaders;

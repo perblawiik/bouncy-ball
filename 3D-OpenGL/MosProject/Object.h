@@ -101,7 +101,7 @@ public:
 		}
 	}
 
-	void stopAnimation(const int id)
+	void pauseAnimation(const int id)
 	{
 		if (!animations.empty()) {
 			selectAnimation(id);
@@ -174,6 +174,7 @@ public:
 
 		if (texture)
 		{
+			glActiveTexture(GL_TEXTURE0);
 			texture->use();
 		}
 		if (mesh)
@@ -194,6 +195,7 @@ public:
 	{
 		if (texture)
 		{
+			glActiveTexture(GL_TEXTURE0);
 			texture->use();
 		}
 		if (mesh)

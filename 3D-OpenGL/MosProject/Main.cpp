@@ -32,14 +32,12 @@ void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 // Get IDs for the uniform locations in shader (prints warning message to console if not found)
 void getUniformLocationIDs(Shader &shader, GLint &MV, GLint &CV, GLint &P, GLint &color, GLint &cameraPos);
-
 // Load simulation with specified number of steps and store all particle positions in a single matrix.
 void createSimulation(GLFWwindow* window, SoftBody &bouncyBall, Matrix &PARTICLE_POSITION_DATA, Settings &settings);
 // Render one cycle of the simulation, if step counter is larger than total steps, the step counter is reset to 1
 void renderSimulationStep(int &stepCounter, const int NUM_STEPS, Settings &settings, Matrix &PARTICLE_POSITION_DATA, SoftBody &softBody);
 // Save simulation data to a text file
 void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulationSettings, const std::string &simulationName);
-
 // Load animations (used for multithreading)
 void loadAnimationsFromFile(Object &bouncyBalls, bool &loadingComplete);
 
@@ -102,7 +100,7 @@ int main()
 	/** SHADERS **/
 	/*************/
 	// Create our main shader (responsible for all the lighting in the scene)
-	Shader mainShader("Shaders//mainShader.vert", "Shaders//mainShader.frag");
+	Shader mainShader("Shaders//main_scene_shader.vert", "Shaders//main_scene_shader.frag");
 	// Activate shader
 	mainShader.use();
 
@@ -113,11 +111,11 @@ int main()
 
 	// Perspective projection matrix
 	GLfloat perspectiveMatrix[16] = { 0 };
-	MATRIX4::perspective(perspectiveMatrix, PI / 3, (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
+	MATRIX4::perspective(perspectiveMatrix, PI / 3.0f, (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f); // Field of view is set to PI/3 (60 degrees)
 	mainShader.setFloatMat4("perspective", perspectiveMatrix); // Insert Projection Matrix
 
 	// Lamp shader
-	Shader lampShader("Shaders//lampShader.vert", "Shaders//lampShader.frag");
+	Shader lampShader("Shaders//lamp_shader.vert", "Shaders//lamp_shader.frag");
 	lampShader.use();
 	lampShader.setFloatMat4("perspective", perspectiveMatrix); // Set perspective projection matrix
 
@@ -135,10 +133,11 @@ int main()
 	mainShader.use();
 	mainShader.setVec3("lightPosition", lightPosition[0], lightPosition[1], lightPosition[2]);
 	mainShader.setVec3("lightColor", lightColor[0], lightColor[1], lightColor[2]);
-
+	mainShader.setInt("textureImage", 0);
+	mainShader.setInt("shadowMap", 1);
 
 	// Simple loading screen shaders
-	Shader loadingShader("Shaders//loadingScreenShader.vert", "Shaders//loadingScreenShader.frag");
+	Shader loadingShader("Shaders//loading_screen_shader.vert", "Shaders//loading_screen_shader.frag");
 
 
 	/****************/
@@ -174,7 +173,7 @@ int main()
 	// Compute the entire simulation with specified number of steps
 	createSimulation(window, bouncyBall, PARTICLE_POSITION_DATA, settings);
 	// Save simulation data to a textfile with given name as parameter
-	saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
+	//saveSimulationSequence(bouncyBall, PARTICLE_POSITION_DATA, settings, "BouncyBall_01");
 	*/
 
 
@@ -338,6 +337,45 @@ int main()
 
 	// Synchronize threads before moving on
 	loadingThread.join();
+
+	/********************/
+	/** SHADOW MAPPING **/
+	/********************/
+	const unsigned int SHADOW_WIDTH = 1360, SHADOW_HEIGHT = 1360;
+	unsigned int depthMapFBO;
+	glGenFramebuffers(1, &depthMapFBO);
+	// create depth texture
+	unsigned int depthMap;
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	GLfloat borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	// attach depth texture as FBO's depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Use camera matrix for the light direction
+	camera.setPosition(lightPosition[0], lightPosition[1], lightPosition[2]);
+	camera.setRotation(-90.0f, 0.0f, 0.0f);
+	GLfloat lightSpaceMatrix[16] = { 0.0f };
+	MATRIX4::perspectiveInfinite(lightSpaceMatrix, 6.0f * PI / 7.0f, 1.0f, 0.1f);
+	MATRIX4::multiply(lightSpaceMatrix, camera.getTransform()->matrix4, lightSpaceMatrix);
+
+	Shader depthShader("Shaders//simple_depth_shader.vert", "Shaders//simple_depth_shader.frag");
+	depthShader.use();
+	depthShader.setFloatMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+	/***************************************************/
+
 	
 	// Time variables
 	time = (GLfloat)glfwGetTime();
@@ -370,67 +408,109 @@ int main()
 			camera.getPosition()[2]
 		);
 
-		// Get window size (it will change if the user resizes the window)
-		glfwGetWindowSize(window, &width, &height);
-		// Set viewport
-		glViewport(0, 0, width, height); // The entire window
 
-		/*** Rendering commands here ***/
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		// 1. Render depth of scene to texture (from light's perspective)
+		// render scene from light's point of view
+		depthShader.use();
+		depthShader.setFloatMat4("lightSpaceMatrix", lightSpaceMatrix);
 
-		// Draw lamp
-		lamp.render(&lampShader);
+		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+		glClear(GL_DEPTH_BUFFER_BIT);
 
-		// Draw floor
-		floor.render(&mainShader);
+		// Render scene
+		//floor.render(&simpleDepthShader);
+		//ceiling.render(&simpleDepthShader);
+		//pillar.renderStaticPoses(&simpleDepthShader);
+		//wall.renderStaticPoses(&simpleDepthShader);
 
-		// Draw roof
-		ceiling.render(&mainShader);
-
-		// Draw pillars
-		pillar.renderStaticPoses(&mainShader);
-
-		// Draw walls
-		wall.renderStaticPoses(&mainShader);
-		
-		
-		// Draw bouncy balls
 		// Animation 0
 		bouncyBalls.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
 		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		bouncyBalls.startAnimation(0);
 		bouncyBalls.update(); // Update animation
-		bouncyBalls.render(&mainShader); // Draw
+		bouncyBalls.render(&depthShader); // Draw
 		// Animation 1
 		bouncyBalls.setColor(1.0f, 0.0f, 1.0f); // Set color to Magenta
 		bouncyBalls.setPosition(settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		bouncyBalls.startAnimation(1);
 		bouncyBalls.update(); // Update animation
-		bouncyBalls.render(&mainShader); // Draw
+		bouncyBalls.render(&depthShader); // Draw
 		// Animation 2
 		bouncyBalls.setColor(1.0f, 0.5f, 0.0f); // Set color to Orange
 		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, 0.0f);
 		bouncyBalls.startAnimation(2);
 		bouncyBalls.update(); // Update animation
-		bouncyBalls.render(&mainShader); // Draw
+		bouncyBalls.render(&depthShader); // Draw
 		// Animation 3
 		bouncyBalls.setColor(0.0f, 1.0f, 1.0f); // Set color to Cyan
 		bouncyBalls.setPosition(0.0f, 0.0f, 0.0f);
 		bouncyBalls.startAnimation(3);
 		bouncyBalls.update(); // Update animation
-		bouncyBalls.render(&mainShader); // Draw
+		bouncyBalls.render(&depthShader); // Draw
 		// Animation 4
 		bouncyBalls.setColor(1.0f, 1.0f, 1.0f); // Set color to White
 		bouncyBalls.setPosition((floorDimX / 2.0f) - (settings.RADIUS * 4.0f), 0.0f, 0.0f);
 		bouncyBalls.startAnimation(4);
 		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&depthShader); // Draw
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// 2. Reset viewport and render scene as usual
+		glfwGetWindowSize(window, &width, &height);
+		glViewport(0, 0, width, height); // The entire window
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		mainShader.use();
+		mainShader.setFloatMat4("lightSpaceMatrix", lightSpaceMatrix);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depthMap);
+	
+		// Render scene
+		lamp.render(&lampShader);
+		floor.render(&mainShader);
+		ceiling.render(&mainShader);
+		pillar.renderStaticPoses(&mainShader);
+		wall.renderStaticPoses(&mainShader);
+
+		// Draw bouncy balls
+		// Animation 0
+		bouncyBalls.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
+		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
+		bouncyBalls.pauseAnimation(0);
+		bouncyBalls.update(); // Update animation
 		bouncyBalls.render(&mainShader); // Draw
-		
+		// Animation 1
+		bouncyBalls.setColor(1.0f, 0.0f, 1.0f); // Set color to Magenta
+		bouncyBalls.setPosition(settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
+		bouncyBalls.pauseAnimation(1);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
+		// Animation 2
+		bouncyBalls.setColor(1.0f, 0.5f, 0.0f); // Set color to Orange
+		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, 0.0f);
+		bouncyBalls.pauseAnimation(2);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
+		// Animation 3
+		bouncyBalls.setColor(0.0f, 1.0f, 1.0f); // Set color to Cyan
+		bouncyBalls.setPosition(0.0f, 0.0f, 0.0f);
+		bouncyBalls.pauseAnimation(3);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
+		// Animation 4
+		bouncyBalls.setColor(1.0f, 1.0f, 1.0f); // Set color to White
+		bouncyBalls.setPosition((floorDimX / 2.0f) - (settings.RADIUS * 4.0f), 0.0f, 0.0f);
+		bouncyBalls.pauseAnimation(4);
+		bouncyBalls.update(); // Update animation
+		bouncyBalls.render(&mainShader); // Draw
 
 		/*
 		// DRAW SIMULATION 
-		footballTexture.use();
+		stripeTexture.use();
 		// Place sphere infront of the camera
 		MATRIX4::translate(modelViewMatrix, 0.0f, 0.0f, -50.0f);
 		// Update with new model view matrix

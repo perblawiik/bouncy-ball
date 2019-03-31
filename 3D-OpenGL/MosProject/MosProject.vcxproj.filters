@@ -64,22 +64,28 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\lampShader.frag">
+    <None Include="Shaders\lamp_shader.frag">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\lampShader.vert">
+    <None Include="Shaders\lamp_shader.vert">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\mainShader.frag">
+    <None Include="Shaders\loading_screen_shader.frag">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\mainShader.vert">
+    <None Include="Shaders\loading_screen_shader.vert">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\loadingScreenShader.frag">
+    <None Include="Shaders\main_scene_shader.frag">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\loadingScreenShader.vert">
+    <None Include="Shaders\main_scene_shader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\simple_depth_shader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\simple_depth_shader.vert">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
