@@ -545,7 +545,7 @@ int main()
 
 	return 0;
 }
-
+/*
 
 void createSimulation(GLFWwindow* window, SoftBody &softBody, Matrix &PARTICLE_POSITION_DATA, Settings &settings)
 {
@@ -632,7 +632,7 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		std::ostream_iterator<GLuint> uint_out_it(outFile, "\n"); // Iterator for handling integers
 		std::ostream_iterator<char> out_it_char(outFile, ""); // Iterator for handling characters
 
-		/** Save Simulation Data **/
+		// Save Simulation Data
 		std::string filePath = ("Simulations//" + simulationName + ".sim");
 		outFile.open(filePath, std::ostream::out);
 
@@ -651,7 +651,7 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		std::copy(animationSequence, animationSequence + DATA.size(), float_out_it);
 		outFile.close();
 
-		/** Save Mesh Data **/
+		// Save Mesh Data
 		filePath = ("Simulations//" + simulationName + ".mesh");
 		outFile.open(filePath, std::ofstream::out);
 
@@ -678,6 +678,7 @@ void saveSimulationSequence(SoftBody &sb, Matrix &DATA, const Settings &simulati
 		outFile.close();
 	}
 }
+*/
 
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
