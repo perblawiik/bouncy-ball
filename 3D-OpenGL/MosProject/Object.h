@@ -147,11 +147,11 @@ public:
 		
 	}
 
-	void update()
+	void update(const int speed = 1)
 	{
 		if (!animations.empty()) {
 
-			animations[animationID]->update();
+			animations[animationID]->update(speed);
 			// Update the vertex array of the mesh from the animation step data
 			for (int i = 0; i < mesh->getNumVertices(); ++i) {
 				// Vertex coordinates

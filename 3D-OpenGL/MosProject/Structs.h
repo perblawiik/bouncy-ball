@@ -66,12 +66,12 @@ struct MATRIX4
 	}
 
 	// Creates a scale matrix
-	static void scale(GLfloat M[], const GLfloat &scale)
+	static void scale(GLfloat M[], const GLfloat &x, const GLfloat &y, const GLfloat &z)
 	{
-		M[0] = scale; M[4] = 0.0f;  M[8] = 0.0f;  M[12] = 0.0f;
-		M[1] = 0.0f;  M[5] = scale; M[9] = 0.0f;  M[13] = 0.0f;
-		M[2] = 0.0f;  M[6] = 0.0f;  M[10] = scale; M[14] = 0.0f;
-		M[3] = 0.0f;  M[7] = 0.0f;  M[11] = 0.0f;  M[15] = 1.0f;
+		M[0] = x;	 M[4] = 0.0f; M[8] = 0.0f;  M[12] = 0.0f;
+		M[1] = 0.0f; M[5] = y;	  M[9] = 0.0f;  M[13] = 0.0f;
+		M[2] = 0.0f; M[6] = 0.0f; M[10] = z;    M[14] = 0.0f;
+		M[3] = 0.0f; M[7] = 0.0f; M[11] = 0.0f; M[15] = 1.0f;
 	}
 
 	// Creates a rotation matrix in X-direction

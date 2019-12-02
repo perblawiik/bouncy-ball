@@ -246,16 +246,16 @@ int main()
 
 	// Create and add transformation matrices for different locations to the pillar object
 	Transform staticPose;
-	staticPose.setPosition(-(floorDimX / 2.0f) + pillarRadius, (pillarHeight / 2.0f) + floorLevel, (floorDimZ / 2.0f) - pillarRadius);
+	staticPose.setPosition(-floorDimX / 4.0f, (pillarHeight / 2.0f) + floorLevel, floorDimZ / 4.0f);
 	pillar.addStaticPose(staticPose.matrix4); // Pose 0 (lower left corner)
 
-	staticPose.setPosition((floorDimX / 2.0f) - pillarRadius, (pillarHeight / 2.0f) + floorLevel, (floorDimZ / 2.0f) - pillarRadius);
+	staticPose.setPosition(floorDimX / 4.0f, (pillarHeight / 2.0f) + floorLevel, floorDimZ / 4.0f);
 	pillar.addStaticPose(staticPose.matrix4); // Pose 1 (lower right corner)
 
-	staticPose.setPosition(-(floorDimX / 2.0f) + pillarRadius, (pillarHeight / 2.0f) + floorLevel, -(floorDimZ / 2.0f) + pillarRadius);
+	staticPose.setPosition(-floorDimX / 4.0f, (pillarHeight / 2.0f) + floorLevel, -floorDimZ / 4.0f);
 	pillar.addStaticPose(staticPose.matrix4); // Pose 2 (upper left corner)
 
-	staticPose.setPosition((floorDimX / 2.0f) - pillarRadius, (pillarHeight / 2.0f) + floorLevel, -(floorDimZ / 2.0f) + pillarRadius);
+	staticPose.setPosition(floorDimX / 4.0f, (pillarHeight / 2.0f) + floorLevel, -floorDimZ / 4.0f);
 	pillar.addStaticPose(staticPose.matrix4); // Pose 3 (upper right corner)
 
 
@@ -308,7 +308,7 @@ int main()
 	Object bouncyBalls;
 	bouncyBalls.setMesh(&ball);
 	bouncyBalls.setTexture(&stripeTexture);
-	
+
 	// Load animations from files with a separated thread
 	bool loadingComplete = false;
 	std::thread loadingThread(loadAnimationsFromFile, std::ref(bouncyBalls), std::ref(loadingComplete));
@@ -341,7 +341,7 @@ int main()
 	/********************/
 	/** SHADOW MAPPING **/
 	/********************/
-	const unsigned int SHADOW_WIDTH = 1360, SHADOW_HEIGHT = 1360;
+	const unsigned int SHADOW_WIDTH = 4000, SHADOW_HEIGHT = 4000;
 	unsigned int depthMapFBO;
 	glGenFramebuffers(1, &depthMapFBO);
 	// create depth texture
@@ -364,7 +364,7 @@ int main()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// Use camera matrix for the light direction
-	camera.setPosition(lightPosition[0], lightPosition[1], lightPosition[2]);
+	camera.setPosition(lightPosition[0], 100.0f, lightPosition[2]);
 	camera.setRotation(-90.0f, 0.0f, 0.0f);
 	GLfloat lightSpaceMatrix[16] = { 0.0f };
 	MATRIX4::perspectiveInfinite(lightSpaceMatrix, 6.0f * PI / 7.0f, 1.0f, 0.1f);
@@ -408,9 +408,7 @@ int main()
 			camera.getPosition()[2]
 		);
 
-
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		// 1. Render depth of scene to texture (from light's perspective)
 		// render scene from light's point of view
 		depthShader.use();
@@ -421,40 +419,42 @@ int main()
 		glClear(GL_DEPTH_BUFFER_BIT);
 
 		// Render scene
-		//floor.render(&simpleDepthShader);
-		//ceiling.render(&simpleDepthShader);
-		//pillar.renderStaticPoses(&simpleDepthShader);
-		//wall.renderStaticPoses(&simpleDepthShader);
+		//floor.render(&depthShader);
+		//ceiling.render(&depthShader);
+		pillar.renderStaticPoses(&depthShader);
+		//wall.renderStaticPoses(&depthShader);
+
+		int animationSpeed = 2;
 
 		// Animation 0
 		bouncyBalls.setColor(1.0f, 0.25f, 0.25f); // Set color to Red
 		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		bouncyBalls.startAnimation(0);
-		bouncyBalls.update(); // Update animation
+		bouncyBalls.update(animationSpeed); // Update animation
 		bouncyBalls.render(&depthShader); // Draw
 		// Animation 1
 		bouncyBalls.setColor(1.0f, 0.0f, 1.0f); // Set color to Magenta
 		bouncyBalls.setPosition(settings.RADIUS*2.0f, 0.0f, -(settings.RADIUS*2.0f));
 		bouncyBalls.startAnimation(1);
-		bouncyBalls.update(); // Update animation
+		bouncyBalls.update(animationSpeed); // Update animation
 		bouncyBalls.render(&depthShader); // Draw
 		// Animation 2
 		bouncyBalls.setColor(1.0f, 0.5f, 0.0f); // Set color to Orange
 		bouncyBalls.setPosition(-settings.RADIUS*2.0f, 0.0f, 0.0f);
 		bouncyBalls.startAnimation(2);
-		bouncyBalls.update(); // Update animation
+		bouncyBalls.update(animationSpeed); // Update animation
 		bouncyBalls.render(&depthShader); // Draw
 		// Animation 3
 		bouncyBalls.setColor(0.0f, 1.0f, 1.0f); // Set color to Cyan
 		bouncyBalls.setPosition(0.0f, 0.0f, 0.0f);
 		bouncyBalls.startAnimation(3);
-		bouncyBalls.update(); // Update animation
+		bouncyBalls.update(animationSpeed); // Update animation
 		bouncyBalls.render(&depthShader); // Draw
 		// Animation 4
 		bouncyBalls.setColor(1.0f, 1.0f, 1.0f); // Set color to White
 		bouncyBalls.setPosition((floorDimX / 2.0f) - (settings.RADIUS * 4.0f), 0.0f, 0.0f);
 		bouncyBalls.startAnimation(4);
-		bouncyBalls.update(); // Update animation
+		bouncyBalls.update(animationSpeed); // Update animation
 		bouncyBalls.render(&depthShader); // Draw
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);

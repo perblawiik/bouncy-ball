@@ -83,7 +83,7 @@ private:
 		GLfloat dummy[16];
 
 		/*** First, add scale matrix ***/
-		MATRIX4::scale(matrix4, scale[0]);
+		MATRIX4::scale(matrix4, scale[0], scale[1], scale[2]);
 
 		/*** Second, add rotation matrix ***/
 		// 1. Create the rotation matrix by applying rotation to x, y, z one at the time

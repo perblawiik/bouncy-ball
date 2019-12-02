@@ -24,12 +24,12 @@ public:
 		}
 	}
 
-	void update()
+	void update(const int speed = 1)
 	{
 		// Check if animation should play
 		if (animationIsActive) {
 			// Increment step counter to next time step in the simulation
-			stepCounter++;
+			stepCounter += speed;
 
 			// Check if step counter has reached maximum number of steps
 			if (stepCounter > numSteps)
